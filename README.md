@@ -77,4 +77,4 @@ A package of five `SKILL.md` skills that take a ticket from plan → implementat
 
 | File | Command | What it does |
 |---|---|---|
-| `bug-fixing/investigate-logs/` | `/investigate-logs` | Investigate a production error from a GCP Cloud Logging URL — traces across services to root cause and writes up findings to a wiki |
+| `bug-fixing/investigate-logs/` | `/investigate-logs` | Investigate a production error from a GCP Cloud Logging URL — detects the runtime (GKE, Cloud Run, App Engine, Compute Engine, Cloud Functions, Dataflow, Vertex AI), traces across services to root cause, and writes up findings to a wiki |
