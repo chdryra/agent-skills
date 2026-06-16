@@ -31,7 +31,8 @@ Work through each category below. For every issue you find, record:
 
 ### Authentication and authorisation
 
-- Hardcoded credentials or API keys in source files. Check `.env` files committed to the repo, string literals matching key patterns (`sk-`, `Bearer `, `password =`).
+- Hardcoded credentials or API keys in source files. Check string literals matching key patterns (`sk-`, `Bearer `, `password =`).
+- `.env` not in `.gitignore`: distinct from hardcoded keys — the source may correctly use `process.env`, but if `.env` is not gitignored, real credentials placed there will be committed. Check `.gitignore` explicitly. Also verify a `.env.example` exists with placeholder values so developers know what variables are required without needing to share the actual secrets.
 - Missing or bypassable auth checks on routes — trace each route handler and verify that protected routes actually enforce authentication before proceeding.
 - Privilege escalation: routes that accept a user ID from the request body/params and use it without verifying it matches the authenticated session.
 - JWT or session issues: weak secrets, no expiry, algorithm confusion (`"alg": "none"`).
