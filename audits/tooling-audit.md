@@ -30,6 +30,7 @@ Work through each category below. For every issue you find, record:
 - **No dependency caching**: the pipeline installs dependencies from scratch on every run. Check for `actions/cache` or equivalent. Slow pipelines get skipped.
 - **Pipeline never fails on lint errors**: lint step uses `--max-warnings 0` or equivalent, otherwise lint findings are advisory and get ignored.
 - **Secrets in CI config**: env vars with real credentials committed in the workflow file rather than stored as CI secrets.
+- **Monorepo build ordering**: in a workspace where packages depend on each other, tests for a consumer package will fail on a fresh checkout if the dependency package hasn't been built first (its `dist/` doesn't exist). Check that each package has a `pretest` lifecycle hook (or equivalent) that builds its workspace dependencies before the test runner starts. Don't rely on CI running `build` before `test` as the only safeguard — this breaks for anyone running tests locally without a prior build.
 
 ### Test coverage and quality
 
@@ -61,6 +62,7 @@ Work through each category below. For every issue you find, record:
 - **No lockfile committed**: without `package-lock.json`, `pnpm-lock.yaml`, `poetry.lock`, or `go.sum`, dependency versions are not reproducible across environments. CI may install different versions than local dev.
 - **Outdated dependencies with known vulnerabilities**: run `pnpm audit` / `npm audit` / `safety check`. Note any High or Critical findings.
 - **Unpinned dev tool versions**: if the Node/Python/Go version is not pinned in CI (via `.nvmrc`, `.tool-versions`, `engines` field, or the workflow's `node-version`), the build is not reproducible.
+- **Cross-tool version incompatibility**: pinning each tool in isolation is not enough — verify that pinned versions are compatible with each other. Example: pnpm 11.5.2 requires Node ≥22.13 (uses `node:sqlite` internally); pinning pnpm to 11.5.2 while leaving Node at 20 breaks CI entirely. When you pin a tool, cross-check its minimum runtime requirement against the pinned runtime version.
 
 ---
 

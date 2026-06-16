@@ -43,7 +43,7 @@ Work through each category below. For every issue you find, record:
 
 ### External dependencies
 
-- **No timeout on outbound calls**: HTTP requests or database queries with no timeout set. A slow or unresponsive dependency will hang the request indefinitely, exhausting connection pools.
+- **No timeout on outbound calls**: HTTP requests or database queries with no timeout set. A slow or unresponsive dependency will hang the request indefinitely, exhausting connection pools. For LLM SDK clients (Anthropic, OpenAI, etc.), a global fetch timeout is not inherited — the timeout must be passed explicitly as a request option (e.g. `AbortSignal.timeout(30_000)` in the second argument to `client.messages.create()`). Without it, a hung API call holds the connection open until the client disconnects.
 - **No retry logic for transient failures**: network calls to external APIs with no retry on 5xx or timeout. A single transient failure becomes a user-visible error.
 - **No circuit breaking**: repeatedly hammering a failing dependency without back-off, which can cascade into total outage.
 - **Assuming external APIs always return the expected shape**: using `response.data.field` without checking if `data` or `field` exist. Validate the response structure before using it.

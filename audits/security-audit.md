@@ -28,10 +28,12 @@ Work through each category below. For every issue you find, record:
 - SQL injection: search for query construction using string interpolation or concatenation (`` `SELECT... ${var}` ``, `"..." + var`). Parameterized queries (`?` placeholders or ORM equivalents) are the only safe pattern.
 - Command injection: look for OS process execution or dynamic eval calls that incorporate user input — `child_process`/`exec`/`spawn` in Node, `subprocess`/`os.system` in Python, `exec.Command` in Go.
 - NoSQL injection: in MongoDB/similar, look for unsanitized objects passed directly to query operators.
+- Prompt injection: in LLM-integrated code, look for user-supplied text interpolated directly into prompt strings (e.g. `` `Summarize: ${userText}` ``). An attacker can embed instructions that override system prompts, exfiltrate data, or manipulate the model's output. User input should be treated as data, not instructions — pass it in a clearly delimited user message rather than constructing prompt strings via concatenation. Also check whether LLM output is trusted for downstream operations (rendered as HTML, used in a SQL query, passed to a shell) — model output is untrusted data.
 
 ### Authentication and authorisation
 
-- Hardcoded credentials or API keys in source files. Check `.env` files committed to the repo, string literals matching key patterns (`sk-`, `Bearer `, `password =`).
+- Hardcoded credentials or API keys in source files. Check string literals matching key patterns (`sk-`, `Bearer `, `password =`).
+- `.env` not in `.gitignore`: distinct from hardcoded keys — the source may correctly use `process.env`, but if `.env` is not gitignored, real credentials placed there will be committed. Check `.gitignore` explicitly. Also verify a `.env.example` exists with placeholder values so developers know what variables are required without needing to share the actual secrets.
 - Missing or bypassable auth checks on routes — trace each route handler and verify that protected routes actually enforce authentication before proceeding.
 - Privilege escalation: routes that accept a user ID from the request body/params and use it without verifying it matches the authenticated session.
 - JWT or session issues: weak secrets, no expiry, algorithm confusion (`"alg": "none"`).
