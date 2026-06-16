@@ -44,6 +44,12 @@ Work through each category below. For every issue you find, record:
 - **Cache invalidation absent**: a cache exists but is never invalidated when the underlying data changes, leading to stale reads.
 - **Missing HTTP caching headers**: `GET` endpoints returning data that is safe to cache but not setting `Cache-Control`, `ETag`, or `Last-Modified`.
 
+### LLM calls
+
+- **Unbounded input to LLM**: user-supplied text sent to an LLM without a length check. Larger inputs mean higher token costs, longer latency, and potential context-window overflow errors. Check that input is validated or truncated before being included in a prompt.
+- **No caching of LLM responses**: identical prompts re-sent to the LLM on every request. LLM calls are expensive and slow — cache responses keyed on a hash of the full prompt (model + parameters + input) with an appropriate TTL.
+- **Sequential LLM calls that could be parallel**: a loop that awaits one LLM call per iteration when calls are independent. Replace with `Promise.all` / `asyncio.gather` / a goroutine fan-out.
+
 ### Payload and serialisation
 
 - **Over-fetching**: returning entire objects (including large fields like raw text, blobs, or nested relations) when the caller only needs a subset.
