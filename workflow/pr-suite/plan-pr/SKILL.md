@@ -30,11 +30,11 @@ This skill works with whatever tracker your project uses. Detect it in this orde
 
 ---
 
-## Step 1 — Fetch the ticket and ask clarifying questions
+## Step 1 — Establish requirements
 
-Extract the ticket ID from `$ARGUMENTS` (e.g. `PROJ-123`, `ENG-123`, `#123`).
+### 1a — Ticket path (when a ticket ID is provided)
 
-Fetch the ticket from the detected tracker. Read any token programmatically and **never echo it**:
+If `$ARGUMENTS` contains a ticket ID (e.g. `PROJ-123`, `ENG-123`, `#123`), fetch it from the detected tracker. Read any token programmatically and **never echo it**:
 
 - **Linear:** `mcp__linear__get_issue` with the issue id.
 - **Jira:** prefer Jira MCP tools; otherwise REST API v3 `GET <JIRA_URL>/rest/api/3/issue/<KEY>`. Read the auth token from a `JIRA_API_TOKEN` env var; or — *Claude Code only* — `~/.claude.json`.
@@ -46,11 +46,22 @@ Parse out:
 - Any linked tickets or dependencies
 - Labels / components (to identify which part of the codebase is affected)
 
-Review the ticket for anything ambiguous, underspecified, or likely to affect implementation approach — e.g. unclear acceptance criteria, missing edge cases, conflicting requirements, or decisions that belong to the human rather than the agent.
+### 1b — Conversation path (when no ticket ID is provided)
+
+If `$ARGUMENTS` is empty or contains no recognisable ticket ID, derive the goals from the conversation context:
+
+1. Read back through the conversation to extract what the user has described — features, fixes, behaviours, constraints, acceptance criteria, or examples they've given.
+2. Synthesise a title and a set of scenarios from that description. Use the same structure you would derive from a ticket.
+3. Generate a short kebab-case slug from the topic (e.g. `add-dark-mode`, `fix-auth-timeout`) to use in place of a ticket ID. Confirm the slug with the user only if the topic is ambiguous.
+4. **Only ask the user for clarification if the conversation does not supply enough information to write at least one concrete scenario.** Ask targeted questions — don't request a full spec.
+
+---
+
+After establishing requirements (either path), review them for anything ambiguous, underspecified, or likely to affect implementation approach — e.g. unclear acceptance criteria, missing edge cases, conflicting requirements, or decisions that belong to the human rather than the agent.
 
 If there are any such questions, **ask them now** before exploring the codebase. Present them as a numbered list and wait for answers before continuing to Step 2.
 
-If the ticket is unambiguous and self-contained, say so briefly and proceed directly to Step 2.
+If the requirements are unambiguous and self-contained, say so briefly and proceed directly to Step 2.
 
 ---
 
@@ -96,7 +107,7 @@ For each scenario defined in the ticket:
 
 ### Branch name
 
-`feat/<ticket-id-lowercase>-<short-slug>`
+`feat/<ticket-id-or-slug>-<short-description>`
 
 ### Out of scope
 
@@ -111,7 +122,7 @@ For each scenario defined in the ticket:
 
 ## Step 4 — Review the plan
 
-Write the draft plan to `.claude/plans/<ticket-id>.md` (creating `.claude/plans/` if needed).
+Write the draft plan to `.claude/plans/<ticket-id-or-slug>.md` (creating `.claude/plans/` if needed).
 
 **If the `review-plan` skill is installed**, spawn it as a sub-agent for an independent critique:
 
@@ -160,7 +171,7 @@ Once all three conditions in Step 5 are met (review APPROVED, open questions res
 
 1. Ensure `.claude/plans/<ticket-id>.md` contains the final agreed plan.
 2. Tell the user:
-   > "Plan approved and saved to `.claude/plans/<ticket-id>.md`. Run `/implement-pr <ticket-id>` to start implementation." (if `implement-pr` is installed)
+   > "Plan approved and saved to `.claude/plans/<slug>.md`. Run `/implement-pr <slug>` to start implementation." (if `implement-pr` is installed)
 
 ---
 

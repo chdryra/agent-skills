@@ -70,13 +70,18 @@ From the PR description, extract the ticket ID. Look for:
 - A `[PROJ-123]` style reference.
 - A tracker URL (e.g. `atlassian.net/browse/PROJ-123`, `linear.app/.../issue/ENG-123`).
 
-If no ticket is found, post a review comment noting this and stop.
+If no ticket is found:
+1. Check the PR body for an embedded `<!-- goals ... -->` HTML comment block. If present, extract the `### Goals` section from it and use that as the requirements source (see Step 3 conversation path).
+2. If no goals block, check whether a plan file exists at `.claude/plans/<slug>.md` where the slug matches the branch name. If a plan file exists, use it as the requirements source.
+3. If none of the above, post a review comment noting that no ticket, embedded goals, or plan file could be found, and stop.
 
 ---
 
-## Step 3 — Fetch the ticket
+## Step 3 — Establish the requirements to review against
 
-Fetch the ticket from the detected tracker. Read any token programmatically and **never echo it**:
+### Ticket path
+
+If a ticket ID was found in Step 2, fetch it from the detected tracker. Read any token programmatically and **never echo it**:
 
 - **Linear:** `mcp__linear__get_issue` with the issue id.
 - **Jira:** prefer Jira MCP tools; otherwise REST API v3 `GET <JIRA_URL>/rest/api/3/issue/<KEY>`, run entirely in-process so the token stays out of terminal scrollback. Read the auth token from a `JIRA_API_TOKEN` env var; or — *Claude Code only* — `~/.claude.json`.
@@ -88,6 +93,16 @@ Extract:
 - **Summary table** if present.
 
 (Jira descriptions use Atlassian Document Format — parse the ADF JSON to plain text.)
+
+### Conversation path (no ticket — PR body, plan file, or `--local` mode)
+
+If there is no ticket, use the first available source in this order:
+
+1. **PR body goals block** — extract the `### Goals` section from the `<!-- goals -->` HTML comment in the PR description. Use those scenarios as the requirements.
+2. **Plan file** — read `.claude/plans/<slug>.md` and use its `### Scenarios` section.
+3. **`--local` mode** — the plan file at `.claude/plans/<slug>.md` is the expected source; if missing, note it and stop.
+
+Use whichever source is found first. Do not ask the user for requirements.
 
 ---
 

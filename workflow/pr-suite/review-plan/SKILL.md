@@ -40,9 +40,11 @@ Detect it in this order:
 
 ---
 
-## Step 2 — Fetch the ticket
+## Step 2 — Establish the requirements to review against
 
-Fetch the ticket from the detected tracker. Read any token programmatically and **never echo it**:
+### Ticket path (when the ID matches a known tracker format)
+
+If `<ticket-id>` looks like a real tracker ID (e.g. `PROJ-123`, `ENG-123`, `#123`), fetch it from the detected tracker. Read any token programmatically and **never echo it**:
 
 - **Linear:** `mcp__linear__get_issue` with the issue id.
 - **Jira:** prefer Jira MCP tools; otherwise REST API v3 `GET <JIRA_URL>/rest/api/3/issue/<KEY>`. Read the auth token from a `JIRA_API_TOKEN` env var; or — *Claude Code only* — `~/.claude.json`.
@@ -53,6 +55,14 @@ Extract from the response:
 - **Acceptance criteria** — any explicit requirements.
 - **Summary table** if present.
 - **Out of scope** items (so the plan isn't penalised for not covering them).
+
+### Conversation path (when no tracker ticket exists)
+
+If `<ticket-id>` is a slug (not a tracker ID), or if the tracker fetch fails, use the plan file itself as the source of requirements:
+
+1. Read the `### Scenarios` section of the plan file — these are the requirements the plan committed to covering.
+2. Read the `### Summary` section for overall intent.
+3. Do not ask the user for requirements — use what is in the plan.
 
 ---
 
