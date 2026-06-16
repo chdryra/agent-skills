@@ -26,7 +26,9 @@ Part of the **PR suite**. Works best after `/plan-pr <ticket-id>`; uses `review-
 
 Extract the ticket ID from `$ARGUMENTS`.
 
-Read `.claude/plans/<ticket-id>.md`. If it does not exist, either run `/plan-pr <ticket-id>` first (if installed), or ask the user for the intended changes before continuing.
+Read `.claude/plans/<ticket-id>.md`. If it does not exist:
+1. Check the conversation for a clear description of what needs to be implemented. If the intent is obvious from context, derive a slug and proceed — synthesise the plan structure (title, scenarios, files) from what has been discussed.
+2. If the conversation does not supply enough to write at least one concrete scenario, suggest running `/plan-pr <slug>` first (if installed), or ask the user for the intended changes before continuing.
 
 From the plan, extract:
 - The branch name (`feat/<ticket-id-lowercase>-<short-slug>`).
@@ -143,7 +145,7 @@ cat .github/PULL_REQUEST_TEMPLATE.md 2>/dev/null || true
 Create the PR:
 ```bash
 gh pr create \
-  --title "<type>(<scope>): <description> [<TICKET-ID>]" \
+  --title "<type>(<scope>): <description> [<TICKET-ID-or-slug>]" \
   --body "$(cat <<'EOF'
 <PR body following the repo's PR template if present>
 EOF
@@ -151,7 +153,14 @@ EOF
 ```
 
 The PR body should include:
-- The ticket reference (linkable).
+- The ticket reference (linkable) if one exists, or the slug if not.
+- A `<!-- goals -->` block containing the scenarios from the plan, so that `review-pr` can use them when run from a different environment without access to the local plan file. Format it as:
+  ```
+  <!-- goals
+  ### Goals
+  <paste the ### Scenarios section from the plan verbatim>
+  -->
+  ```
 - A scenario coverage table (same format as the review output).
 - Any known limitations.
 
