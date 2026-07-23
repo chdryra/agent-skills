@@ -1,7 +1,7 @@
 ---
 name: review-plan
 description: Review an implementation plan against a ticket. Fetches the ticket from your issue tracker, maps each requirement/scenario to the plan, identifies gaps or risks, and returns a structured assessment with a sign-off decision. Used as a sub-agent by plan-pr, but can be run standalone.
-argument-hint: <ticket-id> <plan-file>
+argument-hint: <ticket-id> <plan-file> [ticket-cache-file]
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep
 ---
 
@@ -32,19 +32,24 @@ Detect it in this order:
 
 ## Step 1 — Parse arguments
 
-`$ARGUMENTS` is: `<ticket-id> <plan-file>`
+`$ARGUMENTS` is: `<ticket-id> <plan-file> [ticket-cache-file]`
 
 - Extract the ticket ID (e.g. `PROJ-123`).
 - Extract the plan file path (e.g. `.claude/plans/PROJ-123.md`).
+- Extract the optional ticket cache file path (e.g. `.context/pr-suite/PROJ-123/ticket.md`).
 - Read the plan file contents. If the plan file does not exist, output: `ERROR: Plan file not found at <path>`.
 
 ---
 
 ## Step 2 — Establish the requirements to review against
 
+### Ticket cache — check first
+
+If a ticket cache file was passed as the third argument, or `.context/pr-suite/<ticket-id>/ticket.md` exists, read it and use it as the requirements — skip tracker detection and the fetch entirely. This is the normal path when invoked from `plan-pr`, which caches the ticket on its first fetch.
+
 ### Ticket path (when the ID matches a known tracker format)
 
-If `<ticket-id>` looks like a real tracker ID (e.g. `PROJ-123`, `ENG-123`, `#123`), fetch it from the detected tracker. Read any token programmatically and **never echo it**:
+If there is no cache and `<ticket-id>` looks like a real tracker ID (e.g. `PROJ-123`, `ENG-123`, `#123`), fetch it from the detected tracker. Read any token programmatically and **never echo it**:
 
 - **Linear:** `mcp__linear__get_issue` with the issue id.
 - **Jira:** prefer Jira MCP tools; otherwise REST API v3 `GET <JIRA_URL>/rest/api/3/issue/<KEY>`. Read the auth token from a `JIRA_API_TOKEN` env var; or — *Claude Code only* — `~/.claude.json`.
@@ -82,7 +87,7 @@ For each scenario or acceptance criterion in the ticket:
 
 ## Step 4 — Produce the assessment
 
-Output the assessment in this exact format so `plan-pr` can parse it:
+Output **only** the assessment block below — no preamble, no narration of what was read, no restating the plan. When run as a sub-agent, this block is the entire return value. Use this exact format so `plan-pr` can parse it:
 
 ```
 ## Plan review: <TICKET-ID>

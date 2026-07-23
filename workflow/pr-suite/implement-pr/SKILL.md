@@ -99,7 +99,12 @@ git commit -m "<type>(<scope>): <description> [<TICKET-ID>]"
 **If the `review-pr` skill is installed**, run it in `--local` mode as a sub-agent, passing the ticket ID:
 
 > Invoke the review-pr skill with arguments: `--local <ticket-id>`
-> Return the full review output.
+> Return ONLY the review block (coverage table, gaps, verdict) — no narration.
+
+**Token discipline for this loop:**
+- The first pass is a full review. `review-pr --local` writes `.context/pr-suite/<ticket-id>/last-review.md` (previous table + reviewed SHA), so every later pass in this loop is automatically a **delta review** — only the diff since the last reviewed SHA is re-assessed, unchanged rows carry forward. It also caches the fetched ticket at `.context/pr-suite/<ticket-id>/ticket.md`, so the tracker is hit once, not once per pass.
+- Run intermediate loop passes on a smaller model (`model: sonnet` on the Agent call) — mapping a small delta to scenarios doesn't need the top model. The final pre-PR gate (Step 5) runs `--full` on the session model.
+- Cap the loop at 3 iterations. If gaps remain after that, present them to the user instead of continuing to burn passes.
 
 **If `review-pr` is not installed**, do the same check inline: diff the branch against `origin/main`, re-read the ticket, and map each scenario to the diff yourself.
 
@@ -130,7 +135,11 @@ git fetch origin && git merge origin/main
 ```
 If there are merge conflicts, resolve them, then `git add` the resolved files and `git commit` before continuing.
 
-After merging, re-run the local review (Step 4) until clean to confirm the merge didn't break scenario coverage.
+After merging, run the final pre-PR gate — one full review on the session model:
+
+> Invoke the review-pr skill with arguments: `--local <ticket-id> --full`
+
+If it surfaces gaps, fix them via the Step 4 (delta) loop and re-run the gate. This single `--full` pass replaces the old "re-run until clean" full reviews.
 
 Push the branch:
 ```bash
@@ -172,179 +181,33 @@ Output the PR URL to the user.
 
 This step requires the `monitor-pr` skill. **If it isn't installed**, skip to Step 7 and tell the user to watch the PR manually (or re-run `/review-pr <pr-number> --watch` later).
 
-After the PR is created, start an event-driven monitor and react to events as they arrive. The model is only invoked when an event actually fires (new comment, CI fail, branch behind main, PR state flip, HEAD SHA change) — far cheaper than fixed-interval polling.
+After the PR is created, monitoring is event-driven — the model is only invoked when something real happens (new comment, CI fail, branch behind main, PR state flip, SHA change).
 
-### 6a — Start the monitor
+### 6a — Write the handoff state file
+
+Write `.context/pr-suite/<ticket-id>/state.md` containing: PR number, repo (`owner/repo`), branch name, worktree path, ticket ID, plan file path, and `last_pushed_sha: <current HEAD SHA>`. Event handling reads this file instead of conversation history — it survives compaction and lets sub-agents work without the full context.
+
+### 6b — Start the monitor
 
 > Invoke the `monitor-pr` skill with arguments: `<PR_NUMBER>`
 
-Capture the returned task ID. The monitor emits one notification per real state change. See the `monitor-pr` skill for the event format and the full list of event types.
+Capture the returned task ID. The monitor emits one notification per real state change (see `monitor-pr` for the event format and types). After invocation, **do not enter a polling loop** — stay idle; each notification routes to the dispatch below.
 
-After invocation, control returns here. **Do not enter a polling loop.** Stay idle. Each subsequent notification routes to the handler below, keyed on `EVENT <type>`. The `<owner>/<repo>` in the commands below is the PR's repo (the monitor defaults to the current repo).
+### 6c — Event dispatch
 
-### 6b — Event handlers
+By this point the conversation is large, and notifications usually arrive more than 5 minutes apart — so every inline handling turn re-reads the whole conversation with a cold prompt cache, once per tool call. Handle events in a sub-agent instead, keeping the main-loop turn to a single Agent call plus a one-line relay:
 
-Branch on the event type from each notification.
+- **`state`** with `to=MERGED` / `to=CLOSED`: handle inline — stop the monitor (`TaskStop <task-id>`), then proceed to Step 7.
+- **`armed` / `heartbeat`**: no action.
+- **Everything else** (`inline`, `review`, `issue`, `ci_fail`, `sha`, `behind`, `restarted`): spawn ONE general-purpose sub-agent per notification, passing every event line it contains (the monitor batches events per poll — give the agent the whole batch):
 
-#### `inline` / `review` / `issue` — new reviewer comment
+  > Read `<skill-dir>/handlers.md` (the directory this SKILL.md lives in) and `.context/pr-suite/<ticket-id>/state.md`. Handle these events: `<event lines>`. Work in the worktree recorded in state.md. Update `last_pushed_sha` in state.md after any push. If an event needs a user decision (ambiguous comment, unfixable CI failure), don't guess — say so. Return a 1-3 sentence summary of what you did.
 
-These three event types are reviewer comments from different endpoints. The reaction is the same; only the **reply mechanism** differs (see step 7 below).
-
-For each new comment:
-
-1. Read the body from the event line (fetch the full body via `gh api repos/<owner>/<repo>/pulls/$PR_NUMBER/{comments,reviews}/<id>` or `gh api repos/<owner>/<repo>/issues/comments/<id>` if the truncated preview is insufficient).
-2. Understand the reviewer's concern. For `inline` events, the `path=` / `line=` fields locate the code. For `review` and `issue` events there is no file/line context.
-3. Implement the fix: read the relevant file(s), make the targeted change, then stage and commit:
-   ```bash
-   git add <specific-files-changed>
-   git commit -m "fix: address review comment — <short description> [<TICKET-ID>]"
-   ```
-4. Re-run the local review (Step 4) to validate the fix. If any ❌ rows or addressable ⚠️ rows remain, address them and re-commit before continuing. Do not push or reply until the local review is clean.
-5. Merge latest main before pushing:
-   ```bash
-   git fetch origin && git merge origin/main
-   ```
-   Resolve any conflicts, then `git add` and `git commit` before continuing.
-6. Push: `git push`
-7. Reply to the comment. The reply mechanism depends on the event type:
-   - **`inline`** — reply in-thread on the inline-comments endpoint. Use `in_reply_to=` from the event line if non-null, else the comment's own id:
-     ```bash
-     gh api "repos/<owner>/<repo>/pulls/$PR_NUMBER/comments" --input - <<'EOF'
-     { "body": "Fixed — <one sentence on what was done and where>.", "in_reply_to": <id> }
-     EOF
-     ```
-     (Passing the body via `--input -` as JSON avoids shells eating backticks in `-f body=...`. POSTing to `/comments` with `in_reply_to` works for all sources, including bots whose `/replies` endpoint may 404.)
-   - **`review`** — top-level review submission. Reply as a PR issue comment; the inline `/comments` API rejects review ids:
-     ```bash
-     gh pr comment $PR_NUMBER --body "Addressed review from @<reviewer-login> — <one sentence on what was done and where>."
-     ```
-   - **`issue`** — PR-level comment from a human. Reply with another PR issue comment:
-     ```bash
-     gh pr comment $PR_NUMBER --body "@<reviewer-login> — <reply>."
-     ```
-
-After pushing fixes, update the PR title/description if scope has meaningfully changed (see 6c). The monitor dedupes by id automatically; the event won't fire again for the same comment.
-
-#### `ci_fail` — CI check transitioned to fail
-
-1. Fetch the failure log. Use the `link=` URL from the event line:
-   ```bash
-   gh run view <run-id> --log-failed 2>&1 | head -100
-   # or, for a specific job:
-   gh api "repos/<owner>/<repo>/actions/jobs/<job-id>/logs" 2>&1 | grep -iE "FAIL|Error|panic|cannot" | head -30
-   ```
-2. Diagnose the root cause from the log output.
-3. Implement the fix and commit:
-   ```bash
-   git add <specific-files-changed>
-   git commit -m "fix: address CI failure — <short description> [<TICKET-ID>]"
-   ```
-4. Re-run the local review (Step 4); fix any ❌ or addressable ⚠️ rows before pushing.
-5. Merge latest main and push:
-   ```bash
-   git fetch origin && git merge origin/main && git push
-   ```
-6. Post a PR comment describing the fix:
-   ```bash
-   gh pr comment $PR_NUMBER --body "Fixed CI failure in <job-name> — <one sentence on root cause and fix>."
-   ```
-
-If the failure is not fixable in code (flaky test, infra issue), surface it to the user instead of looping. The same check name won't re-fire unless it briefly leaves and re-enters the fail bucket, so an unfixable failure won't keep waking you.
-
-#### `sha` — HEAD SHA changed (external push or own push)
-
-The monitor emits this on every SHA change, including your own pushes after fixes. Decide whether the push warrants a re-review by walking the first-parent chain to distinguish automated branch-update / auto-merge commits from developer pushes:
-
-An automerge / update-branch commit is a **merge commit (2+ parents) committed by a bot rather than a person**. Detect the bot generically — don't hardcode a vendor list — so the skill works whatever merge tooling (if any) a repo uses:
-
-```bash
-OLD=<old SHA from event>
-NEW=<new SHA from event>
-
-# Optional override: only needed if your repo's merge tooling commits under a
-# plain user login (not a `[bot]` account). Leave empty otherwise. Examples of
-# tools whose commits are already caught automatically by the `[bot]` / web-flow
-# checks below: kodiakhq[bot], mergify[bot], github-merge-queue[bot],
-# dependabot[bot], and GitHub's web-UI merge account (web-flow).
-AUTOMERGE_BOTS="${AUTOMERGE_BOTS:-}"   # e.g. 'ci-merger|release-bot'
-
-# A committer is an automerge bot if: it's GitHub's web-UI merge account,
-# its login is a GitHub App (ends in `[bot]`), or it matches the optional
-# override list above.
-is_automerge_committer() {
-  local login="$1"
-  [ "$login" = "web-flow" ] && return 0
-  case "$login" in *'[bot]') return 0 ;; esac
-  [ -n "$AUTOMERGE_BOTS" ] && printf '%s' "$login" | grep -qE "^($AUTOMERGE_BOTS)$" && return 0
-  return 1
-}
-
-WALK_SHA=$NEW
-IS_AUTO_MERGE=1
-WALK_LIMIT=10
-while [ "$WALK_SHA" != "$OLD" ] && [ "$WALK_LIMIT" -gt 0 ]; do
-  WALK_DATA=$(gh api "repos/<owner>/<repo>/commits/$WALK_SHA" \
-    --jq '{c: .committer.login, p: [.parents[].sha], n: (.parents | length)}')
-  WALK_COMMITTER=$(echo "$WALK_DATA" | jq -r .c)
-  WALK_PARENT_COUNT=$(echo "$WALK_DATA" | jq -r .n)
-  if [ "$WALK_PARENT_COUNT" -lt 2 ] || ! is_automerge_committer "$WALK_COMMITTER"; then
-    IS_AUTO_MERGE=0
-    break
-  fi
-  WALK_SHA=$(echo "$WALK_DATA" | jq -r '.p[0]')
-  WALK_LIMIT=$((WALK_LIMIT - 1))
-done
-[ "$WALK_LIMIT" -eq 0 ] && [ "$WALK_SHA" != "$OLD" ] && IS_AUTO_MERGE=0
-```
-
-The `[bot]` suffix check catches any GitHub App merge bot without configuration; the `AUTOMERGE_BOTS` override is only for the rarer case of a bot that commits under a plain user login.
-
-Always sync the local worktree (restore any files an install step marked dirty before pulling):
-```bash
-git pull
-git fetch origin
-```
-
-If `IS_AUTO_MERGE=1`, no further action needed. If `IS_AUTO_MERGE=0` (developer push): re-run the local review (Step 4), then loop — fix any ❌ or addressable ⚠️ rows the new push introduces, commit, push, re-review. Stop when clean.
-
-Skip the SHA event entirely if it corresponds to a push you just made in another handler (track the SHA you just pushed in the conversation; the monitor will emit it, but you can no-op).
-
-#### `behind` — `mergeStateStatus` flipped to BEHIND
-
-Merge main into the branch and push:
-```bash
-git fetch origin && git merge origin/main --no-edit && git push
-```
-If there are conflicts, resolve and commit before pushing. After pushing, expect a `sha` event for the merge commit — handle it as your own push (auto-merge).
-
-#### `state` — PR closed or merged
-
-If `to=MERGED` or `to=CLOSED`, the monitor's job is done:
-```bash
-# TaskStop <task-id from 6a>
-```
-Then proceed to Step 7.
-
-#### `armed` — first-run confirmation
-
-No action — the monitor logs this once to confirm it has started.
-
-### 6c — Update PR title and description
-
-After any handler pushes fixes, check whether the PR title and description still accurately reflect the changes. If the scope has meaningfully changed (new scenarios addressed, files added/removed, approach changed), update them:
-
-```bash
-gh pr edit $PR_NUMBER --title "<updated title>" --body "$(cat <<'EOF'
-<updated PR body>
-EOF
-)"
-```
-
-Only update if the changes are substantive — minor review-comment fixes that don't alter scope don't need a description update.
+  Relay the sub-agent's summary to the user in one short line. Do not read files or run git commands in the main loop for these events — the handler file and state file give the sub-agent everything it needs.
 
 ### 6d — Exit conditions
 
-The model is invoked only when an event fires; otherwise idle. Stop the monitor (`TaskStop`) when any of:
+Stop the monitor (`TaskStop`) when any of:
 - A `state` event arrives with `to=MERGED` or `to=CLOSED`.
 - The user sends a message (interrupt).
 
@@ -387,7 +250,7 @@ After the PR is merged, closed, or interrupted, reflect on the session:
 ## Notes
 
 - Don't skip the local review loop — don't create the PR until it passes clean.
-- Address review comments one at a time, not in a single bulk commit, so each reply is precise.
+- Commit review-comment fixes per comment (so each reply is precise), but batch the validation: one review pass, one merge, one push per notification batch — not per comment.
 - Never force-push — always create new commits for review fixes.
 - If a review comment is ambiguous or would require a significant design change, surface it to the user rather than guessing.
 - The plan file (`.claude/plans/<ticket-id>.md`) is read-only input — this skill does not modify it.
@@ -396,4 +259,4 @@ After the PR is merged, closed, or interrupted, reflect on the session:
 
 ## Learnings
 
-*Populated automatically after each session. Do not edit manually. Keep entries generic — no private or commercial specifics.*
+*Populated automatically after each session. Do not edit manually. Keep entries generic — no private or commercial specifics. Cap this section at ~12 entries of 1-2 lines each; when adding, merge or drop older entries rather than growing the list.*

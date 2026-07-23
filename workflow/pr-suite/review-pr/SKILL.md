@@ -1,7 +1,7 @@
 ---
 name: review-pr
 description: Review a PR against the ticket it references. Fetches the PR diff, extracts the ticket ID, fetches the ticket requirements from your issue tracker, maps scenarios to implementation, and posts a structured review comment on the PR. With --watch, starts an event-driven monitor (via monitor-pr) and re-reviews on new commits. Pass --local to review the current branch diff without posting (used by implement-pr before a PR exists).
-argument-hint: <pr-number-or-url> [--watch] | --local <ticket-id>
+argument-hint: <pr-number-or-url> [--watch] | --local <ticket-id> [--full]
 allowed-tools: Bash, Read, Edit, Glob, Grep, Write
 ---
 
@@ -56,6 +56,15 @@ git diff origin/main...HEAD
 ```
 Using `origin/main` (the remote-tracking ref) avoids `git fetch origin main:main`, which fails when `main` is checked out in another worktree (the default under `implement-pr`'s worktree approach). After producing the review (Step 5), output it directly to the conversation — do not post to GitHub.
 
+**Delta mode (automatic in `--local`):** `.context/pr-suite/<ticket-id>/last-review.md` records the previous coverage table and the SHA it reviewed (`reviewed_sha`). If that file exists and `--full` was NOT passed:
+- Diff only `git diff <reviewed_sha>..HEAD` instead of the whole branch.
+- Re-assess only the scenarios whose "where handled" files overlap that delta, or that the delta could plausibly affect. Carry every other row forward unchanged, marked `(carried)` in the Notes/Where column.
+- If the delta is empty, return the previous table with a "no changes since last review" verdict and stop.
+
+If the file doesn't exist, or `--full` was passed, review the full `origin/main...HEAD` diff.
+
+**Either way, after composing the review (Step 5), overwrite `last-review.md` with the new coverage table and the current HEAD SHA.** Callers force a full pass with `--full` (used as the final pre-PR gate) or by deleting the file.
+
 ---
 
 ## Step 2 — Fetch the PR
@@ -79,9 +88,13 @@ If no ticket is found:
 
 ## Step 3 — Establish the requirements to review against
 
+### Ticket cache — check first
+
+Before any tracker detection or fetch: if `.context/pr-suite/<ticket-id>/ticket.md` exists, read it and use it as the requirements source — skip the fetch entirely. (The cache is written by whichever suite skill fetches the ticket first; within a pipeline run it is trusted. Refresh only if the user says the ticket has changed.)
+
 ### Ticket path
 
-If a ticket ID was found in Step 2, fetch it from the detected tracker. Read any token programmatically and **never echo it**:
+If there is no cache and a ticket ID was found in Step 2, fetch it from the detected tracker, then write the parsed requirements (title, scenarios, acceptance criteria, out-of-scope) to `.context/pr-suite/<ticket-id>/ticket.md` for later passes. Read any token programmatically and **never echo it**:
 
 - **Linear:** `mcp__linear__get_issue` with the issue id.
 - **Jira:** prefer Jira MCP tools; otherwise REST API v3 `GET <JIRA_URL>/rest/api/3/issue/<KEY>`, run entirely in-process so the token stays out of terminal scrollback. Read the auth token from a `JIRA_API_TOKEN` env var; or — *Claude Code only* — `~/.claude.json`.
@@ -152,6 +165,8 @@ Status symbols:
 - ❌ Not implemented.
 - ➖ Not applicable — handled by a different system (e.g. frontend-only, out of scope).
 
+**Output only this block** — no preamble, no narration of what was read, no quoting the diff beyond what a table cell needs. When run as a sub-agent, the block above is the entire return value.
+
 ---
 
 ## Step 6 — Post the review to GitHub
@@ -186,9 +201,9 @@ Capture the returned task ID. See the `monitor-pr` skill for the event format. A
 
 #### `sha` — new commits on the PR branch
 
-1. Fetch the new diff: `gh pr diff <number> --repo <owner/repo>`.
-2. Re-run Steps 4–6 (re-review against the same ticket).
-3. In the new comment, note which scenarios changed status vs. the previous review.
+1. Fetch only what changed: `gh api "repos/<owner>/<repo>/compare/<old>...<new>"` (SHAs from the event line) — not the full PR diff.
+2. Re-assess only the scenarios that delta could plausibly affect; carry the other rows forward from your previous review's table (keep it in `.context/pr-suite/pr-<number>/last-review.md`, updated after each posted review).
+3. Post the updated table (Steps 5-6), noting which rows changed status vs. the previous review. If no scenario is affected, skip posting and just note it in conversation.
 
 #### `behind` — main is ahead of the PR branch
 
