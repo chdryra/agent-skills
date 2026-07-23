@@ -17,28 +17,50 @@ Check in this order:
 ## Write mode
 
 1. Find today's entry: look for a child page / section whose title starts with today's date (`YYYY-MM-DD`).
-2. **If today's entry exists, append to it — never create a second entry for the same date.** Update the title summary if the day's scope grew.
+2. **If today's entry exists, update it — never create a second entry for the same date.** Refresh existing sections in place rather than appending duplicates. Update the title summary if the day's scope grew.
 3. If it doesn't exist, create it with title: `YYYY-MM-DD — <short summary of the day's work>`.
-4. Append content using the sections below.
 
-### What to record
+### Ticket Summary section (if an issue tracker is connected)
 
-Use these sections (only the ones that apply):
+Open the entry with a **Ticket Summary** heading containing three groups, populated from real-time tracker status (not from memory of the session):
 
-- **Done** — work completed, with PR numbers / commit refs / links
-- **Decisions** — what was decided and *why*; the rationale is the point
-- **Findings** — things discovered (bugs, security issues, doc drift), with `file:line` refs
-- **Planned** — tickets created (with links), next steps, sequencing constraints between tickets
-- **Post-suggestions / process notes** — reviews, model choices, tooling issues and fixes
+- **Completed this session:** — tickets finished (PR merged or status → Done). Linked bullets. If none, `—`.
+- **In progress at end of session:** — tickets started but not finished (branch cut or PR open, not merged). Tickets created straight into the backlog do **not** belong here. If none, `—`.
+- **Tickets created:** — new tickets opened this session, started or not. If none, `—`.
 
-Write for a reader with **zero session context**: full sentences, absolute dates, no session-local shorthand. Link tickets, PRs, and related pages. Before finishing, confirm the entry answers: what changed, what was decided and why, what's next.
+### What to record — the substance bar
+
+The reader is someone months from now deciding what happened and why. Every line must earn its place by telling them something they couldn't guess. Use these sections, only the ones that apply:
+
+- **Done** — outcomes shipped, with PR numbers / commit refs / links.
+- **Decisions** — what was decided and *why*; the rationale is the point.
+- **Findings** — things discovered (bugs, security issues, doc drift), with `file:line` refs.
+- **Planned** — tickets created (with links), next steps, sequencing constraints between tickets.
+- **Process notes** — skill/tooling improvements, review-cycle lessons, model choices.
+
+**When a ticket is completed this session, the entry must describe what the ticket delivered as a whole** — what a user or the system can now do that it couldn't before — even if most of the implementation happened in an earlier session. Check the last entry or two: if no previous entry covered the implementation, summarise it here from the ticket and PR. "Addressed review comments and merged PR #NN" is a footnote, not a record of the work.
+
+Do **not** record routine mechanics, unless one had unusual consequences worth explaining:
+
+- updating a branch with main, pushing, rebasing
+- build/format/test checks passing (fold "tests pass" into the outcome line if worth saying at all)
+- worktree/branch/scratch-file housekeeping
+- replying to reviewers, PR ceremony
+
+A short entry beats a padded one. If a session produced little of substance, two or three lines is a perfectly good entry.
+
+### Writing style
+
+Plain, everyday English for a reader with zero session context — including a non-technical one. Full sentences, absolute dates, no session-local shorthand. Lead each bullet with the outcome, then the supporting detail. Gloss any unavoidable technical term the first time it appears (e.g. "a worktree — a separate working copy of the repo"). Link tickets, PRs, and related pages.
+
+Plain English is not a licence to narrate: apply the substance bar first, then explain what survives it simply. Before finishing, confirm the entry answers: what changed, what was decided and why, what's next.
 
 ## Recall mode
 
 When asked what happened previously or why something was decided:
 
 1. List the journal's child entries (sorted chronologically by title).
-2. Read the relevant entries. Large results can blow the token limit — extract only the plain text you need.
+2. Read the relevant entries. Extract only the plain text you need.
 3. Treat entries as background context reflecting what was true when written; verify file/ticket references still exist before acting on them.
 
 At the start of a session involving non-trivial work, it's worth skimming the most recent entry or two for context.
@@ -51,21 +73,14 @@ The journal lives as a Notion page with dated child pages.
 
 **Finding the journal page:** Search Notion for "Journal" using `API-post-search`. If one result looks right, confirm with the user. If the user has noted the page ID in memory, use that. If none found, ask the user to share the page URL or ID and offer to save it to memory for future sessions.
 
-**Creating entries:** Use `API-post-page` with parent `page_id` = Journal page. Use `API-get-block-children` to list existing entries and check for today's date before creating.
+**Use the markdown tools only.** They handle headings, bold, and links natively, and a whole page is one call each way:
 
-**Formatting constraints:** The `mcp__notion__API-patch-block-children` MCP tool only accepts `paragraph` and `bulleted_list_item` blocks. For headings, call the Notion REST API directly. Find the token in this order — read it programmatically, never echo it: a memory file, a `NOTION_API_KEY` env var, or — *Claude Code only* — `~/.claude.json` under `mcpServers.notion.env`:
+- `API-retrieve-page-markdown` — read a page as compact markdown. On the Journal parent page, this returns the list of dated entries (titles + URLs) in one small call.
+- `API-update-page-markdown` — edit a page. `replace_content` rewrites the whole page; `update_content` applies exact find-and-replace edits (copy `old_str` verbatim from a fresh `API-retrieve-page-markdown` read).
+- `API-post-page` — create the day's page with its title only, then write the body with one `replace_content` call.
+- `API-patch-page` — update a page title.
 
-```python
-import json, urllib.request
-# Load token from config
-body = {'children': [
-    {'object': 'block', 'type': 'heading_2',
-     'heading_2': {'rich_text': [{'type': 'text', 'text': {'content': 'Done'}}]}},
-]}
-req = urllib.request.Request(f'https://api.notion.com/v1/blocks/{PAGE_ID}/children',
-                             method='PATCH', headers=headers, data=json.dumps(body).encode())
-print(urllib.request.urlopen(req).status)
-```
+Do **not** use the block-level tools (`API-get-block-children`, `API-patch-block-children`, per-block deletes) or the raw Notion REST API for journal work. The delete-every-block-and-rebuild pattern they force is obsolete; it takes dozens of calls to do what `update_content` does in one.
 
 ---
 
@@ -77,7 +92,7 @@ The journal lives as a Confluence page with dated child pages under a "Journal" 
 
 **Creating entries:** `POST /rest/api/content` with `type: page`, `ancestors: [{id: <journal-page-id>}]`, and the entry title. Use Confluence's storage format (XHTML-based) or the v2 API with Markdown if available.
 
-**Appending to existing entries:** `PUT /rest/api/content/{id}` with the updated body. Always fetch the current version number first — Confluence requires it for updates.
+**Updating existing entries:** `PUT /rest/api/content/{id}` with the updated body. Always fetch the current version number first — Confluence requires it for updates.
 
 **Auth:** API token via `Authorization: Basic base64(email:token)` or Bearer token. Load from env or config; never hardcode.
 
