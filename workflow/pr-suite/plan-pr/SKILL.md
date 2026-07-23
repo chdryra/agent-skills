@@ -46,6 +46,8 @@ Parse out:
 - Any linked tickets or dependencies
 - Labels / components (to identify which part of the codebase is affected)
 
+Write the parsed requirements (title, scenarios, acceptance criteria, out-of-scope) to `.context/pr-suite/<ticket-id>/ticket.md` (create the directory; `.context/` should be gitignored). The whole PR suite reuses this cache — `review-plan`, `implement-pr`, and `review-pr` read it instead of re-fetching the ticket on every pass. If the cache already exists, read it instead of fetching; refresh only if the user says the ticket has changed.
+
 ### 1b — Conversation path (when no ticket ID is provided)
 
 If `$ARGUMENTS` is empty or contains no recognisable ticket ID, derive the goals from the conversation context:
@@ -75,6 +77,8 @@ Based on the ticket's affected area, explore the relevant parts of the codebase:
 4. Identify all files that will need to change and why.
 
 Do not skim — read the actual file contents of anything the implementation will touch.
+
+Keep the exploration cheap on context, though: use an Explore sub-agent for the broad discovery (which modules are involved, how similar features are structured) and keep only its conclusions; Read directly and fully just the files the implementation will change. This matters because Steps 4-6 loop over this conversation repeatedly — every file dumped here is re-read on every iteration.
 
 ---
 
@@ -126,8 +130,10 @@ Write the draft plan to `.claude/plans/<ticket-id-or-slug>.md` (creating `.claud
 
 **If the `review-plan` skill is installed**, spawn it as a sub-agent for an independent critique:
 
-> Invoke the review-plan skill with arguments: `<ticket-id> .claude/plans/<ticket-id>.md`
-> Return the full assessment output.
+> Invoke the review-plan skill with arguments: `<ticket-id> .claude/plans/<ticket-id>.md .context/pr-suite/<ticket-id>/ticket.md`
+> Return ONLY the assessment block (coverage table, risks, sign-off) — no narration.
+
+The third argument is the ticket cache from Step 1 — it saves the reviewer a fresh tracker fetch on every iteration.
 
 **If `review-plan` is not installed**, perform the review inline: re-read the ticket and the plan, and for each ticket scenario/acceptance criterion check coverage (covered / partial / missing) and note any risks. Produce the same sign-off (**APPROVED** / **CHANGES NEEDED**) yourself.
 
@@ -138,7 +144,7 @@ Write the draft plan to `.claude/plans/<ticket-id-or-slug>.md` (creating `.claud
 ## Step 5 — Present to human for approval
 
 Immediately after Step 4 (in the same response turn), show the user:
-1. The current plan (paste the full contents of `.claude/plans/<ticket-id>.md`).
+1. The plan — on the **first** presentation, paste the full contents of `.claude/plans/<ticket-id>.md`; on later iterations, show only the sections that changed since the last presentation, plus the file path.
 2. The review's sign-off decision (**APPROVED** or **CHANGES NEEDED**) and any ❌ missing scenarios or blocking risks.
 3. Any open questions from the plan's "Open questions" section — these must be presented and resolved even if the review returned **APPROVED**.
 
@@ -158,7 +164,7 @@ If the review returned **CHANGES NEEDED**, the human requests changes, or any op
 
 1. Update the plan based on the feedback or answers to open questions.
 2. Overwrite `.claude/plans/<ticket-id>.md` with the revised plan.
-3. Re-run the review (Step 4).
+3. Re-run the review (Step 4) — but **only if scenarios, approach, or the file list changed**. If the edit is small and unambiguous (wording, a scope note, recording an answer to an open question without altering the approach), skip the re-review and go straight to Step 5.
 4. Re-present to the human (Step 5).
 
 Repeat until all three conditions in Step 5 are met.
@@ -188,6 +194,7 @@ After the session ends (plan approved, or user abandons), reflect on how the pla
 2. **Update this skill file** if a learning is general enough to apply to future sessions:
    - Add it to the **## Learnings** section below.
    - Only add it if it would change the plan output or exploration approach for a future ticket.
+   - Keep the section compact: at most ~12 entries of 1-2 lines each; merge or drop older entries rather than growing the list.
 
 3. Do **not** record ticket-specific implementation details — only methodology improvements. Keep learnings free of any private or commercial specifics.
 
