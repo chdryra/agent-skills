@@ -229,7 +229,15 @@ git worktree remove --force .git-worktrees/<ticket-id-slug>
 
 ---
 
-## Step 8 — Self-update from learnings
+## Step 8 — Journal the outcome (optional)
+
+If a journal skill is installed (e.g. a repo or global `/journal` skill), invoke it after the PR merges so the day's log records what the ticket delivered **as a whole** — what a user or the system can now do that it couldn't before — not just "addressed comments and merged PR #NN". Merge time is when this record is most easily lost: a session that only handles review comments and merges has little implementation context, so pull the substance from the ticket and PR if the work happened in earlier sessions.
+
+Skip this step if no journal skill is installed or the PR was closed without merging.
+
+---
+
+## Step 9 — Self-update from learnings
 
 After the PR is merged, closed, or interrupted, reflect on the session:
 

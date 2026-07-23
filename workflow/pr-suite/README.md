@@ -24,6 +24,7 @@ These skills cross-reference each other, but each is **independently installable
 - `plan-pr` spawns `review-plan` if it's installed; otherwise it reviews the plan inline.
 - `implement-pr` uses `review-pr --local` if it's installed; otherwise it checks coverage inline. It starts `monitor-pr` if installed; otherwise it tells you to watch the PR manually.
 - `review-pr --watch` needs `monitor-pr`; without it, the one-shot review still works.
+- `implement-pr` logs the merged ticket via a `/journal`-style skill if one is installed; otherwise it skips that step.
 
 So you can:
 - **Install the whole folder** for the full pipeline, or
