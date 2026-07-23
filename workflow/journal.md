@@ -55,6 +55,8 @@ Plain, everyday English for a reader with zero session context — including a n
 
 Plain English is not a licence to narrate: apply the substance bar first, then explain what survives it simply. Before finishing, confirm the entry answers: what changed, what was decided and why, what's next.
 
+**Keep it scannable.** A top-level bullet is one bold outcome sentence. If that outcome has several distinct facts hanging off it — what shipped, how it behaves, what was tested, bugs the review caught — give each its own nested sub-bullet under the parent, rather than folding them into one dense paragraph. A wall of unbroken text is a sign the bullet is doing too much; break it up before writing it, not after.
+
 ## Recall mode
 
 When asked what happened previously or why something was decided:
