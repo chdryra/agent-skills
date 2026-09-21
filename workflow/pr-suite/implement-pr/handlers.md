@@ -2,7 +2,16 @@
 
 Read by the per-notification sub-agent spawned in SKILL.md Step 6c (or inline if the main loop is handling directly). Context comes from `.context/pr-suite/<ticket-id>/state.md`: PR number, repo, branch, worktree path, ticket ID, plan file path, `last_pushed_sha`.
 
-All git commands run inside the worktree recorded in state.md. `<owner>/<repo>` below is the repo from state.md; `$PR` is the PR number.
+All git commands run inside the worktree recorded in state.md. `<owner>/<repo>` below is the repo from state.md; `$PR` is the PR number. Commands use `main`; substitute the repo's default branch if it differs.
+
+## Before and after every batch
+
+- **Before acting:** confirm the PR is still open (`gh pr view $PR --json state`) and `git fetch origin` — pushes arrive from outside the session too. If the remote branch has moved, merge it in first.
+- **Deferrals:** respect any listed in state.md or the PR body — don't "fix" a trade-off the user chose on purpose.
+- **Reviewer claims are things to verify in the code, not decisions.** Don't accept a suggested deferral yourself; return it for the user.
+- **Before filing a follow-up ticket,** check the plan's Open Questions and search the tracker (if one is used) — it may already exist.
+- **Run validation in the foreground** — you get no notification for background work.
+- **Before returning:** fetch again, check nothing is left unpushed (`git log @{u}..HEAD` is empty), and record in state.md only a SHA you have just read from `git rev-parse HEAD`.
 
 ## Shared fix cycle
 
@@ -52,7 +61,7 @@ After the fix cycle, reply per comment. The mechanism depends on the event type:
    # or, for a specific job:
    gh api "repos/<owner>/<repo>/actions/jobs/<job-id>/logs" 2>&1 | grep -iE "FAIL|Error|panic|cannot" | head -30
    ```
-2. Diagnose the root cause, then run the shared fix cycle.
+2. Diagnose the root cause. If it is a network or registry blip (other jobs passed, the default branch is green), re-run the failed jobs (`gh run rerun <run-id> --failed`) rather than changing code. Otherwise run the shared fix cycle.
 3. Post: `gh pr comment $PR --body "Fixed CI failure in <job-name> — <one sentence on root cause and fix>."`
 
 If the failure is not fixable in code (flaky test, infra issue), report it back for the user instead of looping. The same check name won't re-fire unless it briefly leaves and re-enters the fail bucket.

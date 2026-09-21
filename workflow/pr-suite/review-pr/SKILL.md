@@ -2,7 +2,7 @@
 name: review-pr
 description: Review a PR against the ticket it references. Fetches the PR diff, extracts the ticket ID, fetches the ticket requirements from your issue tracker, maps scenarios to implementation, and posts a structured review comment on the PR. With --watch, starts an event-driven monitor (via monitor-pr) and re-reviews on new commits. Pass --local to review the current branch diff without posting (used by implement-pr before a PR exists).
 argument-hint: <pr-number-or-url> [--watch] | --local <ticket-id> [--full]
-allowed-tools: Bash, Read, Edit, Glob, Grep, Write
+allowed-tools: Bash, Read, Edit, Glob, Grep, Write, Skill
 ---
 
 # review-pr

@@ -2,7 +2,7 @@
 name: plan-pr
 description: Plan the implementation of a ticket. Fetches the ticket from your issue tracker, explores the codebase, produces a structured implementation plan, optionally has it critiqued by the review-plan skill, and loops with you until you're satisfied. Writes the approved plan to .claude/plans/<ticket-id>.md for use by implement-pr.
 argument-hint: <ticket-id>
-allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent
+allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, Skill
 ---
 
 # plan-pr
@@ -45,10 +45,11 @@ Parse out:
 - Description (scenarios, acceptance criteria, decision tables)
 - Any linked tickets or dependencies
 - Labels / components (to identify which part of the codebase is affected)
+- Comments — decisions often land there rather than in the description (fetch them separately if the tracker's issue call doesn't include them)
 
-If the tracker has a status for it, move the ticket to **In Progress** now — planning is work on the ticket. First check it is not already further along (In Review / Done).
+If your team's tracker workflow has an in-progress status, move the ticket there now — planning is work on the ticket. First check it is not already further along (in review or done).
 
-Write the parsed requirements (title, scenarios, acceptance criteria, out-of-scope) to `.context/pr-suite/<ticket-id>/ticket.md` (create the directory; `.context/` should be gitignored). The whole PR suite reuses this cache — `review-plan`, `implement-pr`, and `review-pr` read it instead of re-fetching the ticket on every pass. If the cache already exists, read it instead of fetching; refresh only if the user says the ticket has changed.
+Write the parsed requirements (title, scenarios, acceptance criteria, out-of-scope, comments) to `.context/pr-suite/<ticket-id>/ticket.md` (create the directory; `.context/` should be gitignored). The whole PR suite reuses this cache — `review-plan`, `implement-pr`, and `review-pr` read it instead of re-fetching the ticket on every pass. If the cache already exists, read it instead of fetching. Refresh it if the user says the ticket has changed, and before each review round if new comments may have arrived — checking the comment count is enough to tell.
 
 ### 1b — Conversation path (when no ticket ID is provided)
 
@@ -208,7 +209,7 @@ After the session ends (plan approved, or user abandons), reflect on how the pla
 - If the ticket has no scenario list, derive scenarios from the acceptance criteria.
 - Do not begin any implementation work in this skill — planning only.
 - Open questions should be resolved with the human during the iteration loop, not deferred to implementation.
-- The ticket's description is not the whole requirement set. Read its comments before each review round, and treat already-shipped blocker tickets as rules the new work must live under.
+- The ticket's description is not the whole requirement set. Read its comments (cached with it, and refreshed as Step 1a describes), and treat already-shipped blocker tickets as rules the new work must live under.
 - Treat every claim in the ticket as something to check in the code, including "model it on <existing feature>" — that imports the feature's gaps too, so say which differences are deliberate.
 - Follow the nearest existing precedent for names and shapes rather than inventing new ones. If the ticket uses one word for two things, settle the vocabulary with the human before the plan hardens.
 - When adding a value to an enum, role or state set, list every place the set is spelled out. A `default` branch that *does something* instead of refusing quietly gives the new value behaviour nobody chose.
