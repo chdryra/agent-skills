@@ -2,7 +2,7 @@
 name: implement-pr
 description: Implement an approved plan from plan-pr. Reads the plan from .claude/plans/<ticket-id>.md, creates a branch, implements the changes, runs review-pr --local in a loop until clean, then opens the PR. After the PR is up, optionally starts an event-driven monitor (via monitor-pr) and autofixes review comments and CI failures as they arrive.
 argument-hint: <ticket-id>
-allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent
+allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, Skill
 ---
 
 # implement-pr
@@ -18,7 +18,7 @@ Part of the **PR suite**. Works best after `/plan-pr <ticket-id>`; uses `review-
 
 **Credentials required:**
 - **GitHub** — uses the `gh` CLI (must be authenticated).
-- **Issue tracker** — only needed if `review-pr --local` is installed (it fetches the ticket to check coverage).
+- **Issue tracker** — optional. `review-pr --local` uses it to check coverage, and if you use one this skill records deferrals and corrected acceptance criteria there. Without one, those go in the PR body and the state file only.
 
 ---
 
@@ -39,7 +39,11 @@ From the plan, extract:
 
 ## Step 2 — Create the branch
 
-Prefer a dedicated worktree so the user's main working directory is left untouched and the monitoring loop stays stable:
+The examples use `main`; substitute the repo's default branch (`gh repo view --json defaultBranchRef -q .defaultBranchRef.name`). Always branch from and compare against the remote copy (`origin/<default-branch>`), never the local one — it can be far behind, and can't be checked out while another worktree holds it.
+
+If you are already in an isolated per-branch workspace you didn't create (for example, one your tooling set up for this branch), work there instead: skip the `git worktree add` below, record that path as the worktree in Step 6a, and skip Step 7's removal. Only ever remove a path this skill created.
+
+Otherwise, prefer a dedicated worktree so the user's main working directory is left untouched and the monitoring loop stays stable:
 
 ```bash
 git fetch origin
@@ -139,7 +143,9 @@ After merging, run the final pre-PR gate — one full review on the session mode
 
 > Invoke the review-pr skill with arguments: `--local <ticket-id> --full`
 
-If it surfaces gaps, fix them via the Step 4 (delta) loop and re-run the gate. This single `--full` pass replaces the old "re-run until clean" full reviews.
+If it surfaces gaps, fix them via the Step 4 (delta) loop and re-run the gate. This single `--full` pass replaces the old "re-run until clean" full reviews. Don't treat it as a formality: the delta passes only checked what the plan named, and this is the one pass that reads the whole change.
+
+Run the full test suite once more before pushing.
 
 Push the branch:
 ```bash
@@ -199,9 +205,10 @@ By this point the conversation is large, and notifications usually arrive more t
 
 - **`state`** with `to=MERGED` / `to=CLOSED`: handle inline — stop the monitor (`TaskStop <task-id>`), then proceed to Step 7.
 - **`armed` / `heartbeat`**: no action.
-- **Everything else** (`inline`, `review`, `issue`, `ci_fail`, `sha`, `behind`, `restarted`): spawn ONE general-purpose sub-agent per notification, passing every event line it contains (the monitor batches events per poll — give the agent the whole batch):
+- **A task notification with `status: killed`** (not an EVENT line — the runtime killed the monitor task itself): re-invoke `monitor-pr <pr-number>` immediately and silently, and record the new task id. Do not wait to be asked — a dead monitor is indistinguishable from a quiet PR, so the loop is silently over until someone notices. Skip only if the PR has already merged or closed.
+- **Everything else** (`inline`, `review`, `issue`, `ci_fail`, `sha`, `behind`, `restarted`): spawn ONE general-purpose sub-agent per notification, passing every event line it contains (the monitor batches events per poll — give the agent the whole batch). Run handlers one at a time: if another notification arrives while one is working, wait for it to return before spawning the next — two handlers on one branch trip over each other.
 
-  > Read `<skill-dir>/handlers.md` (the directory this SKILL.md lives in) and `.context/pr-suite/<ticket-id>/state.md`. Handle these events: `<event lines>`. Work in the worktree recorded in state.md. Update `last_pushed_sha` in state.md after any push. If an event needs a user decision (ambiguous comment, unfixable CI failure), don't guess — say so. Return a 1-3 sentence summary of what you did.
+  > Read `<skill-dir>/handlers.md` (the directory this SKILL.md lives in) and `.context/pr-suite/<ticket-id>/state.md`. Handle these events: `<event lines>`. Work in the worktree recorded in state.md, and run the checks in the handler file's "Before and after every batch" section. Update `last_pushed_sha` in state.md after any push. If an event needs a user decision (ambiguous comment, unfixable CI failure), don't guess — say so. Return a 1-3 sentence summary of what you did.
 
   Relay the sub-agent's summary to the user in one short line. Do not read files or run git commands in the main loop for these events — the handler file and state file give the sub-agent everything it needs.
 
@@ -214,6 +221,8 @@ Stop the monitor (`TaskStop`) when any of:
 ---
 
 ## Step 7 — Clean up worktree
+
+First check nothing was left behind. A squash or rebase merge rewrites commits, so compare heads rather than looking for your commits on the default branch: the PR's final head (`gh pr view <pr-number> --json headRefOid -q .headRefOid`) should equal the worktree's `git rev-parse HEAD`, and `git log @{u}..HEAD` should be empty. Put any stranded commits on a follow-up PR before removing anything.
 
 If you created a worktree in Step 2, remove it:
 
@@ -237,7 +246,17 @@ Skip this step if no journal skill is installed or the PR was closed without mer
 
 ---
 
-## Step 9 — Self-update from learnings
+## Step 9 — Sync the docs (optional)
+
+If a docs-sync skill is installed — a repo or global skill whose description says it brings a documentation set back in line with the code after PRs merge (e.g. a repo's `/docs-sync`) — invoke it once the PR has merged. It is the cheapest moment to do it: the change is fresh, and a doc set that is checked after every merge never drifts far enough to need a rewrite.
+
+Run it against an up-to-date checkout of the default branch — not the ticket's worktree, and not a directory that may be sitting on some other branch. Fetch first; if no such checkout is to hand, make a temporary worktree of `origin/<default-branch>` and remove it afterwards. If the skill tracks its own sync range (for example, the last commit it synced to), let it work that out rather than passing the PR's commits in. Whether the sync commits or pushes its changes is up to that skill's own rules; this step pushes nothing itself.
+
+Skip this step, silently, if no such skill is installed or the PR was closed without merging. Never treat a failed or skipped docs sync as a failure of the ticket — report it and move on.
+
+---
+
+## Step 10 — Self-update from learnings
 
 After the PR is merged, closed, or interrupted, reflect on the session:
 
@@ -250,6 +269,7 @@ After the PR is merged, closed, or interrupted, reflect on the session:
 2. **Update this skill file** if a learning is general enough to apply to future implementations:
    - Add it to the **## Learnings** section below.
    - Only add it if it would change the implementation or monitoring approach for a future ticket.
+   - Keep the section compact: at most ~12 entries of 1-2 lines each — every entry is read on every run; merge or drop older entries rather than growing the list.
 
 3. Do **not** record ticket-specific implementation details. Keep learnings free of any private or commercial specifics.
 
@@ -258,13 +278,31 @@ After the PR is merged, closed, or interrupted, reflect on the session:
 ## Notes
 
 - Don't skip the local review loop — don't create the PR until it passes clean.
+- Invoking this skill is the user's consent to push the branch and open the PR — once the gate is clean, do both without pausing to ask.
 - Commit review-comment fixes per comment (so each reply is precise), but batch the validation: one review pass, one merge, one push per notification batch — not per comment.
 - Never force-push — always create new commits for review fixes.
 - If a review comment is ambiguous or would require a significant design change, surface it to the user rather than guessing.
 - The plan file (`.claude/plans/<ticket-id>.md`) is read-only input — this skill does not modify it.
 
+### Working rules
+
+**Workspace and git**
+- Read the repo's own test and lint commands before running them; never run them from memory. Many repos need a flag, tag or target that an ad-hoc run misses, and the failure looks like broken code.
+- A failure in code the branch never touched is usually stale state: merge the default branch, check whether it also fails there, and compare your local setup with the README and CI config.
+- After each merge from the default branch, re-run the tests the merge could affect and re-read the plan's assumptions — a sibling change can clash with yours in meaning without clashing in text. The full suite runs before the final push (Step 5).
+
+**Testing**
+- Prove a test matters by breaking the code it covers — flip a condition or make it return a fixed value rather than deleting it, confirm a test fails, then restore it. Break the real code, not a test double.
+- For anything that filters or hides, also test what must still come through, or over-filtering goes unnoticed.
+- When testing a guard (a limit, an auth or size check), first show a valid request succeeds, so the rejection isn't just a malformed request.
+
+**The PR as a record**
+- Keep the PR body current: it is a promise, not a snapshot. Record each deferral in the PR body and the state file (and the tracker, if you use one), and brief every sub-agent on them, or someone "fixes" a trade-off the user chose on purpose.
+- If an acceptance criterion turns out to be wrong, amend it in the tracker with a dated note if you use one; otherwise call it out prominently in the PR body.
+- When the change relies on configuration outside the repo, list those checks in the PR body as an unchecked checklist and say merge waits on them.
+
 ---
 
 ## Learnings
 
-*Populated automatically after each session. Do not edit manually. Keep entries generic — no private or commercial specifics. Cap this section at ~12 entries of 1-2 lines each; when adding, merge or drop older entries rather than growing the list.*
+*Populated automatically after each session. Do not edit manually. Keep entries generic — no private or commercial specifics. Cap this section at ~12 entries of 1-2 lines each — every entry is read on every run; when adding, merge or drop older entries rather than growing the list.*

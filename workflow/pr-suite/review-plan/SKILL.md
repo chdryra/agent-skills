@@ -136,6 +136,7 @@ After each use, reflect on the review:
 2. **Update this skill file** if a learning generalises beyond this ticket:
    - Add it to the **## Learnings** section below.
    - Only add it if it would change how a future plan is reviewed.
+   - Keep the section compact: at most ~12 entries of 1-2 lines each — every entry is read on every run; merge or drop older entries rather than growing the list.
 
 3. Do **not** record ticket-specific plan details. Keep learnings free of any private or commercial specifics.
 
@@ -146,6 +147,13 @@ After each use, reflect on the review:
 - Be specific about *where* in the plan a gap exists — quote the plan section if helpful.
 - Do not penalise partial (⚠️) items if the ticket itself defers them to a follow-up or an out-of-diff mechanism.
 - Focus on correctness and completeness, not style.
+- Verify the plan's checkable claims yourself — "nothing calls this", "no test asserts that", call-site counts — by searching the code, test files included. Plans get these wrong often, and usually undercount.
+- Don't trust the plan's list of tests that will break; search for the old value or assertion. A plan naming zero breaking tests is a reason to look harder.
+- For each proposed test, ask whether it would fail if the change were absent. A too-permissive fixture passes either way.
+- Read an end-to-end test as a script, checking each step against the state the previous one leaves behind.
+- On a second pass, check each fix's reach, not just its presence: look for sibling code paths the revision didn't extend to.
+- When the plan makes previously-legal state illegal, search the tests for fixtures that create it — they break far from the feature.
+- If a key property depends on a setting outside the repository (a cloud permission, a third-party toggle), no test can prove it: require a recorded manual check.
 
 ---
 

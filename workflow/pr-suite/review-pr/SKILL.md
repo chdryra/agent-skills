@@ -2,7 +2,7 @@
 name: review-pr
 description: Review a PR against the ticket it references. Fetches the PR diff, extracts the ticket ID, fetches the ticket requirements from your issue tracker, maps scenarios to implementation, and posts a structured review comment on the PR. With --watch, starts an event-driven monitor (via monitor-pr) and re-reviews on new commits. Pass --local to review the current branch diff without posting (used by implement-pr before a PR exists).
 argument-hint: <pr-number-or-url> [--watch] | --local <ticket-id> [--full]
-allowed-tools: Bash, Read, Edit, Glob, Grep, Write
+allowed-tools: Bash, Read, Edit, Glob, Grep, Write, Skill
 ---
 
 # review-pr
@@ -254,6 +254,7 @@ After the loop exits, reflect on the review cycle:
 2. **Update this skill file** if a learning is general enough to apply to future reviews:
    - Add it to the **## Learnings** section below.
    - Only add it if it would change the review output for a future PR.
+   - Keep the section compact: at most ~12 entries of 1-2 lines each — every entry is read on every run; merge or drop older entries rather than growing the list.
 
 3. Do **not** record PR-specific details. Keep learnings free of any private or commercial specifics.
 
