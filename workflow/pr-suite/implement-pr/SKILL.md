@@ -237,7 +237,17 @@ Skip this step if no journal skill is installed or the PR was closed without mer
 
 ---
 
-## Step 9 — Self-update from learnings
+## Step 9 — Sync the docs (optional)
+
+If a docs-sync skill is installed — a repo or global skill whose description says it brings a documentation set back in line with the code after PRs merge (e.g. a repo's `/vault-sync`) — invoke it once the PR has merged. It is the cheapest moment to do it: the change is fresh, and a doc set that is checked after every merge never drifts far enough to need a rewrite.
+
+Run it from the original working directory (the worktree is gone by now), and let it work out its own range — such skills track the last commit they synced to, so do not pass the PR's commits in.
+
+Skip this step, silently, if no such skill is installed or the PR was closed without merging. Never treat a failed or skipped docs sync as a failure of the ticket — report it and move on.
+
+---
+
+## Step 10 — Self-update from learnings
 
 After the PR is merged, closed, or interrupted, reflect on the session:
 

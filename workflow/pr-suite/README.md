@@ -25,6 +25,7 @@ These skills cross-reference each other, but each is **independently installable
 - `implement-pr` uses `review-pr --local` if it's installed; otherwise it checks coverage inline. It starts `monitor-pr` if installed; otherwise it tells you to watch the PR manually.
 - `review-pr --watch` needs `monitor-pr`; without it, the one-shot review still works.
 - `implement-pr` logs the merged ticket via a `/journal`-style skill if one is installed; otherwise it skips that step.
+- `implement-pr` brings the repo's docs back in line via a docs-sync skill (one that catches a documentation set up with merged PRs) if one is installed; otherwise it skips that step.
 
 So you can:
 - **Install the whole folder** for the full pipeline, or
