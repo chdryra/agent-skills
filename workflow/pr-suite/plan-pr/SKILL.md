@@ -46,6 +46,8 @@ Parse out:
 - Any linked tickets or dependencies
 - Labels / components (to identify which part of the codebase is affected)
 
+If the tracker has a status for it, move the ticket to **In Progress** now — planning is work on the ticket. First check it is not already further along (In Review / Done).
+
 Write the parsed requirements (title, scenarios, acceptance criteria, out-of-scope) to `.context/pr-suite/<ticket-id>/ticket.md` (create the directory; `.context/` should be gitignored). The whole PR suite reuses this cache — `review-plan`, `implement-pr`, and `review-pr` read it instead of re-fetching the ticket on every pass. If the cache already exists, read it instead of fetching; refresh only if the user says the ticket has changed.
 
 ### 1b — Conversation path (when no ticket ID is provided)
@@ -212,3 +214,11 @@ After the session ends (plan approved, or user abandons), reflect on how the pla
 ## Learnings
 
 *Populated automatically after each session. Do not edit manually. Keep entries generic — no private or commercial specifics.*
+
+- The ticket's description is not the whole requirement set. Re-fetch its comments before each review round, and read every already-shipped blocker ticket as rules the new work has to live under — a rule shipped earlier routinely makes the headline scenario unreachable, which is a product question for Step 5 rather than something to quietly implement around.
+- Treat every assertion in a ticket as a claim to grep — including "model it on <existing feature>", which silently imports that feature's gaps, so read the clone source against the *new* acceptance criteria line by line and say which deviations are deliberate. Housekeeping claims lie too: "just regenerate the client" assumes a checked-in artefact is current, and a stale one turns a one-line step into a large unrelated diff better raised as its own ticket.
+- Never propose a name, route shape or authorization primitive from first principles — grep the nearest precedent, follow it, and cite the count ("13 comparable fields carry no type, 1 does"). When a ticket uses one word for two concepts (an individual's rating vs a group's aggregate), settle the vocabulary with the user before the plan hardens; it names types, functions and routes across several tickets.
+- Adding a value to a role or state enum means auditing every place that set is spelled out — switches, list literals, hand-written SQL predicates, validation rules — and counting the sites in the plan. A `default:` arm that *does something* rather than refusing fails open, granting the new value a behaviour or privilege by accident.
+- Reusing a shared SQL predicate helper is not free: check the helper's own `FROM` table against the new query's, because an unaliased correlated subquery can bind to itself and collapse into an always-true test that still returns plausible data. Settle the shape by running the statement against the test database rather than reasoning about it, and have the test assert that a near-miss row is excluded.
+- Anything touching visibility: enumerate every unauthenticated route and check each one rather than reasoning per-domain — a handler that echoes an id, or answers differently for "exists but wrong type" and "doesn't exist", leaks without the query touching the row. Adding a new 404-on-unknown-id to a write endpoint creates the same oracle, so pair every new existence check with the repo's visibility predicate and pin the status-code ordering in the plan.
+- When a human answers an open question with a generalising phrase ("same for anything with a description", "apply that rule everywhere"), treat it as a scope change rather than a confirmation: enumerate every field or call site the rule now reaches, decide each in or out, write the exclusions into the plan with their reasons, and re-run the review — the new scenario has been looked at by nobody.

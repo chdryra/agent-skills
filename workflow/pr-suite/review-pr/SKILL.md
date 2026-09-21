@@ -254,6 +254,7 @@ After the loop exits, reflect on the review cycle:
 2. **Update this skill file** if a learning is general enough to apply to future reviews:
    - Add it to the **## Learnings** section below.
    - Only add it if it would change the review output for a future PR.
+   - Keep the section compact: at most ~12 entries of 1-2 lines each; merge or drop older entries rather than growing the list.
 
 3. Do **not** record PR-specific details. Keep learnings free of any private or commercial specifics.
 
