@@ -240,9 +240,9 @@ Skip this step if no journal skill is installed or the PR was closed without mer
 
 ## Step 9 — Sync the docs (optional)
 
-If a docs-sync skill is installed — a repo or global skill whose description says it brings a documentation set back in line with the code after PRs merge (e.g. a repo's `/vault-sync`) — invoke it once the PR has merged. It is the cheapest moment to do it: the change is fresh, and a doc set that is checked after every merge never drifts far enough to need a rewrite.
+If a docs-sync skill is installed — a repo or global skill whose description says it brings a documentation set back in line with the code after PRs merge (e.g. a repo's `/docs-sync`) — invoke it once the PR has merged. It is the cheapest moment to do it: the change is fresh, and a doc set that is checked after every merge never drifts far enough to need a rewrite.
 
-Run it from the original working directory (the worktree is gone by now), and let it work out its own range — such skills track the last commit they synced to, so do not pass the PR's commits in.
+Run it from the original working directory, not the ticket's worktree. If the skill tracks its own sync range (for example, the last commit it synced to), let it work that out rather than passing the PR's commits in.
 
 Skip this step, silently, if no such skill is installed or the PR was closed without merging. Never treat a failed or skipped docs sync as a failure of the ticket — report it and move on.
 
@@ -261,6 +261,7 @@ After the PR is merged, closed, or interrupted, reflect on the session:
 2. **Update this skill file** if a learning is general enough to apply to future implementations:
    - Add it to the **## Learnings** section below.
    - Only add it if it would change the implementation or monitoring approach for a future ticket.
+   - If the learning only applies to changes touching a database, queries, concurrency or access control, add it to `learnings-data-layer.md` in this skill's directory instead, under the same size rule.
 
 3. Do **not** record ticket-specific implementation details. Keep learnings free of any private or commercial specifics.
 
@@ -281,18 +282,18 @@ After the PR is merged, closed, or interrupted, reflect on the session:
 
 *Populated automatically after each session. Do not edit manually. Keep entries generic — no private or commercial specifics. Cap this section at ~30 entries of 1-3 lines each — every entry is read on every run; when adding, merge or drop older entries rather than growing the list.*
 
+If the change touches a database, queries, concurrency or access control, also read `learnings-data-layer.md` in this skill's directory (skip silently if it isn't installed).
+
 - When the working directory is already an isolated per-branch workspace (a container, or a worktree someone else made), treat it as the worktree: skip Step 2's `git worktree add` and skip Step 7's removal. Only ever remove a path this skill created — removing a pre-existing workspace destroys the user's work.
 - Never invoke the test or lint command from memory — read the repo's own test target first. Repos often gate test-only files behind a build tag or marker, and an ad-hoc run without it fails as a cascade of undefined-symbol errors in files the branch never touched, which reads as broken code rather than a wrong invocation.
 - Compare against `origin/main`, never local `main`: in a long-lived workspace local `main` can be hundreds of commits stale, so `main..HEAD` counts quietly lie, and `git checkout main` fails outright when main is checked out in a sibling worktree. Cut follow-up branches from `origin/main` too.
 - Start any compound shell command with an explicit `cd <absolute path>`, since cwd drifts between calls; and when a subprocess must see variables from an env file with no `export` lines, wrap the source in `set -a` / `set +a`, or it silently falls back to defaults.
-- A failure in territory the branch never touched is usually stale state, not a bug. Merge `origin/main` and re-run, check whether the job already fails on main, diff your env file against the README and CI config, and recreate any persistent local database whose already-applied migration was edited.
+- A failure in territory the branch never touched is usually stale state, not a bug. Merge `origin/main` and re-run, check whether the job already fails on main, diff your env file against the README and CI config, and, if the repo edits migrations in place, recreate any persistent local database whose already-applied migration was edited.
 - After every merge from main, run the type-check and the full suite, and check for numbered collisions git cannot flag — two migrations claiming one version, or two branches appending reference rows with the same id. A sibling's behavioural change lands in files that auto-merge cleanly.
 - When several workspaces share one database or service, a schema failure can be drift left by a sibling branch, and a connection-exhaustion error naming different tests each run is contention. Queue behind any in-flight sibling run, and look for a leaked test process still holding connections.
 - When a sibling ticket touched the same files, expect semantic duplication rather than textual conflict — both sides may have built the same guard. Read every merged function end to end, since changes on different return paths conflict in neither git nor CI, and settle disagreements from the domain model.
 - Re-read the plan's stated assumptions against `origin/main` after each merge, not just its file list. A sibling can falsify "nothing in the codebase does X" without touching a file you touched; where the resulting gap is a product judgement, put it to the user rather than extending the policy yourself.
-- Adding a value to a role/status enum — or a new entity type to a universal-id scheme — means auditing every switch and read-time filter that enumerates the old set. Watch for `default`/`else` arms that fail open by hiding the new value instead of refusing, and add a test that walks the whole enum.
-- Weigh a foreign key by what it prevents, not what it references. An `ON DELETE RESTRICT` key is often the only thing making a check-then-insert safe, so removing it means every create path must re-read the parent `FOR SHARE` in its own transaction; conversely a table recording something already deleted must carry no key at all.
-- Treat a query shape or performance figure the plan hands you as a hypothesis: measure on production-like row counts, compare real query plans rather than reasoning about them, and don't quote a review sub-agent's cost numbers. When a measurement overturns a signed-off decision, amend the plan and tell the user.
+- Adding a value to a role/status enum — or a new kind to any shared registry of types — means auditing every switch and read-time filter that enumerates the old set. Watch for `default`/`else` arms that fail open by hiding the new value instead of refusing, and add a test that walks the whole enum.
 - Pair every test of a filter that hides things with a control asserting what must still be visible — the near-miss case, and the owner who is exempt. Neutering the predicate only proves it hides enough, never that it hides only what it should, and over-hiding is the failure no falsification run catches.
 - When falsifying, replace the clause under test with a tautology rather than deleting it, so a build error can't masquerade as coverage; confirm the run reached the tests; put the fixture one step from the boundary so a single leaked row flips the answer; and restore the file immediately.
 - A test against a guard that runs ahead of the code it protects (a rate limit, an auth or size check) passes even when every request was malformed and would have been refused anyway — assert the success response before the expected rejection. Floor any counting test against an independent number.

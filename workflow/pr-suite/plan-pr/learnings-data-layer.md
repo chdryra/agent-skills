@@ -1,0 +1,6 @@
+# plan-pr — data-layer learnings
+
+Learnings that only apply when a change touches a database, queries, concurrency or access control. Kept out of `SKILL.md` so repos without a data layer don't read them on every run; `SKILL.md` points here when they are relevant. Same rules as the main Learnings section: generic entries only, no private or commercial specifics, at most ~30 entries of 1-3 lines each — merge or drop rather than grow.
+
+- Reusing a shared SQL predicate helper is not free: check the helper's own `FROM` table against the new query's, because an unaliased correlated subquery can bind to itself and collapse into an always-true test that still returns plausible data. Settle the shape by running the statement against the test database rather than reasoning about it, and have the test assert that a near-miss row is excluded.
+- Anything touching visibility: enumerate every unauthenticated route and check each one rather than reasoning per-domain — a handler that echoes an id, or answers differently for "exists but wrong type" and "doesn't exist", leaks without the query touching the row. Adding a new 404-on-unknown-id to a write endpoint creates the same oracle, so pair every new existence check with the repo's visibility predicate and pin the status-code ordering in the plan.

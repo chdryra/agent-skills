@@ -31,6 +31,8 @@ So you can:
 - **Install the whole folder** for the full pipeline, or
 - **Copy one `SKILL.md`** (e.g. just `review-pr`) and it will still work on its own.
 
+`plan-pr`, `review-plan` and `implement-pr` each keep a `learnings-data-layer.md` beside their `SKILL.md`: learnings that only apply when a change touches a database, queries, concurrency or access control. The skill reads it only for such changes, so repos without a data layer never pay for it; copying the whole skill directory brings it along, and a lone `SKILL.md` works without it.
+
 ## Install
 
 Skills are `SKILL.md` directories. Copy whichever you want into your skills directory:
