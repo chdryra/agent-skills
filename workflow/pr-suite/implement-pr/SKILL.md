@@ -261,7 +261,7 @@ After the PR is merged, closed, or interrupted, reflect on the session:
 2. **Update this skill file** if a learning is general enough to apply to future implementations:
    - Add it to the **## Learnings** section below.
    - Only add it if it would change the implementation or monitoring approach for a future ticket.
-   - If the learning only applies to changes touching a database, queries, concurrency or access control, add it to `learnings-data-layer.md` in this skill's directory instead, under the same size rule.
+   - Keep the section compact: at most ~12 entries of 1-2 lines each — every entry is read on every run; merge or drop older entries rather than growing the list.
 
 3. Do **not** record ticket-specific implementation details. Keep learnings free of any private or commercial specifics.
 
@@ -276,41 +276,38 @@ After the PR is merged, closed, or interrupted, reflect on the session:
 - If a review comment is ambiguous or would require a significant design change, surface it to the user rather than guessing.
 - The plan file (`.claude/plans/<ticket-id>.md`) is read-only input — this skill does not modify it.
 
+### Working rules
+
+**Workspace and git**
+- If you are already in an isolated per-branch workspace you didn't create, work there: skip Step 2's `git worktree add` and Step 7's removal. Only ever remove a path this skill created.
+- Compare against and branch from `origin/main`, never local `main` — a local copy can be far behind, and can't be checked out while another worktree holds it.
+- Read the repo's own test and lint commands before running them; never run them from memory. Many repos need a flag, tag or target that an ad-hoc run misses, and the failure looks like broken code.
+- A failure in code the branch never touched is usually stale state: merge `origin/main`, check whether it also fails on main, and compare your local setup with the README and CI config.
+- After each merge from main, re-run the full suite and re-read the plan's assumptions. A sibling change can clash with yours in meaning without clashing in text.
+
+**Testing**
+- Prove a test matters by breaking the code it covers — replace the logic with something always-true rather than deleting it, confirm a test fails, then restore it. Break the real code, not a test double.
+- For anything that filters or hides, also test what must still come through, or over-filtering goes unnoticed.
+- When testing a guard (a limit, an auth or size check), first show a valid request succeeds, so the rejection isn't just a malformed request.
+
+**The PR as a record**
+- Don't treat Step 5's `--full` gate as a formality; delta reviews only check what the plan named.
+- Keep the PR body current: it is a promise, not a snapshot. Record each deferral in the tracker, the PR body and the state file, and brief every sub-agent on them, or someone "fixes" a trade-off the user chose on purpose.
+- If an acceptance criterion turns out to be wrong, amend it in the tracker with a dated note rather than only mentioning it in the PR.
+- When the change relies on configuration outside the repo, list those checks in the PR body as an unchecked checklist and say merge waits on them.
+
+**Handling events**
+- Read the whole batch, then dispatch one handler at a time — two handlers on one branch trip over each other.
+- Never take a handler's summary as proof: check nothing is left unpushed (`git log @{u}..HEAD`) and re-run the affected tests. Only record a SHA you have just read from `git rev-parse HEAD`.
+- Tell handlers to run validation in the foreground; they get no notification for background work.
+- Confirm the PR's current state before acting on any event, and fetch the remote branch before and after each handler — pushes arrive from outside the session too.
+- After a merge, check every commit a handler pushed reached `origin/main`; put any stranded ones on a follow-up PR.
+- If CI fails from a network or registry blip (other jobs passed, main is green), re-run the failed jobs rather than changing code.
+- Treat a reviewer's claims as things to verify, not decisions. Ask the user before accepting a suggested deferral.
+- Before filing a follow-up ticket, check the plan's Open Questions and search the tracker — it may already exist.
+
 ---
 
 ## Learnings
 
-*Populated automatically after each session. Do not edit manually. Keep entries generic — no private or commercial specifics. Cap this section at ~30 entries of 1-3 lines each — every entry is read on every run; when adding, merge or drop older entries rather than growing the list.*
-
-If the change touches a database, queries, concurrency or access control, also read `learnings-data-layer.md` in this skill's directory (skip silently if it isn't installed).
-
-- When the working directory is already an isolated per-branch workspace (a container, or a worktree someone else made), treat it as the worktree: skip Step 2's `git worktree add` and skip Step 7's removal. Only ever remove a path this skill created — removing a pre-existing workspace destroys the user's work.
-- Never invoke the test or lint command from memory — read the repo's own test target first. Repos often gate test-only files behind a build tag or marker, and an ad-hoc run without it fails as a cascade of undefined-symbol errors in files the branch never touched, which reads as broken code rather than a wrong invocation.
-- Compare against `origin/main`, never local `main`: in a long-lived workspace local `main` can be hundreds of commits stale, so `main..HEAD` counts quietly lie, and `git checkout main` fails outright when main is checked out in a sibling worktree. Cut follow-up branches from `origin/main` too.
-- Start any compound shell command with an explicit `cd <absolute path>`, since cwd drifts between calls; and when a subprocess must see variables from an env file with no `export` lines, wrap the source in `set -a` / `set +a`, or it silently falls back to defaults.
-- A failure in territory the branch never touched is usually stale state, not a bug. Merge `origin/main` and re-run, check whether the job already fails on main, diff your env file against the README and CI config, and, if the repo edits migrations in place, recreate any persistent local database whose already-applied migration was edited.
-- After every merge from main, run the type-check and the full suite, and check for numbered collisions git cannot flag — two migrations claiming one version, or two branches appending reference rows with the same id. A sibling's behavioural change lands in files that auto-merge cleanly.
-- When several workspaces share one database or service, a schema failure can be drift left by a sibling branch, and a connection-exhaustion error naming different tests each run is contention. Queue behind any in-flight sibling run, and look for a leaked test process still holding connections.
-- When a sibling ticket touched the same files, expect semantic duplication rather than textual conflict — both sides may have built the same guard. Read every merged function end to end, since changes on different return paths conflict in neither git nor CI, and settle disagreements from the domain model.
-- Re-read the plan's stated assumptions against `origin/main` after each merge, not just its file list. A sibling can falsify "nothing in the codebase does X" without touching a file you touched; where the resulting gap is a product judgement, put it to the user rather than extending the policy yourself.
-- Adding a value to a role/status enum — or a new kind to any shared registry of types — means auditing every switch and read-time filter that enumerates the old set. Watch for `default`/`else` arms that fail open by hiding the new value instead of refusing, and add a test that walks the whole enum.
-- Pair every test of a filter that hides things with a control asserting what must still be visible — the near-miss case, and the owner who is exempt. Neutering the predicate only proves it hides enough, never that it hides only what it should, and over-hiding is the failure no falsification run catches.
-- When falsifying, replace the clause under test with a tautology rather than deleting it, so a build error can't masquerade as coverage; confirm the run reached the tests; put the fixture one step from the boundary so a single leaked row flips the answer; and restore the file immediately.
-- A test against a guard that runs ahead of the code it protects (a rate limit, an auth or size check) passes even when every request was malformed and would have been refused anyway — assert the success response before the expected rejection. Floor any counting test against an independent number.
-- A pagination test that only asserts page one comes back full proves the filter moved into the query, not that the offset counts visible rows. Assert page two resumes exactly where page one stopped, and build the fixture by varying the listing's own sort key.
-- When the fix sits behind a wrapper every test replaces with a double, the suite is green whether the production line works or not. Falsify the production code, not the double; if the suite stays green either way, say so in the PR body and raise the missing seam as a follow-up.
-- Don't let Step 5's `--full` gate become a formality — delta reviews grade only what the plan's scenarios named, so repo-wide invariants the plan never mentioned go unchecked. Run it properly even when every delta pass was clean.
-- Brief the final gate and every event-handling sub-agent on the change's settled deferrals and its security invariants up front, or they re-raise closed decisions as blocking findings and a handler "fixes" a trade-off the user deliberately made.
-- The PR body is a promise, not a snapshot. Re-read it whenever a later commit fixes something it calls "deferred", and mark any scenario the user reversed mid-implementation as a deliberate departure — left stale, the next reviewer grades the diff against a spec nobody is following.
-- Record a deferral in three places: a tracked ticket, the PR bullet naming it, and the state file event handlers read. Kept only in the PR body or the conversation, it gets "fixed" inside the current PR the moment a reviewer raises it — applying the very approach that was deliberately rejected.
-- When implementation proves an acceptance criterion describes behaviour that does not and should not exist, amend it in the tracker with a dated note saying why, and fix the matching test-plan line. A PR-body caveat alone leaves the next reader grading a merged change against a spec it never met.
-- When a change makes an external service's configuration load-bearing, no test in the repo can prove it. List those checks in the PR body as an unchecked checklist, say merge is blocked until they are run, record the same blocker in the state file, and put the standing requirement in the setup docs.
-- Dispatch one event handler at a time, and read the whole batch before dispatching: two handlers push to the same branch and rewrite the same state file, and a clean review often arrives in the same batch as the merge that followed it, which needs no handler at all.
-- Never take a handler's summary as proof — check `git log @{u}..HEAD` comes back empty (agents commit and then don't push) and re-run the affected tests uncached. Never write a SHA into the state file that you have not just read from `git rev-parse HEAD`.
-- Sub-agents get no completion notification for background commands, so tell handlers to run validation synchronously and never wait on the parent's monitor. "I'll wait for the notification" is the tell that one stopped early — resume that same agent rather than spawning a second, which would race on its files.
-- Confirm PR state before acting on any event: a "behind" or SHA line can arrive after the merge already happened, or name a commit caught mid-push. A monitor also baselines the PR when it starts, so anything that landed before it is never reported — read the PR yourself before starting one.
-- Not every event on your PR is yours — reviews and pushes arrive from watchers outside the session, including an "update branch" merge onto your own branch. Make `git fetch` and a look at the remote head a handler's first and last act, reconcile by merging, and never force-push.
-- A handler's fixes can be stranded when the PR merges mid-fix. Before treating a merge as closing the ticket, check that every commit a handler reported pushing is an ancestor of `origin/main`; if one is stranded, put it on a fresh branch cut from the updated main and open a follow-up PR.
-- A CI failure from a registry or network blip is diagnosable without touching the diff — sibling jobs passed and main is green — so wait for the run to finish and re-run the failed jobs rather than escalating. For a flaky failure the pattern is the diagnosis: same function, different subtests each run.
-- Treat a reviewer's claims as hypotheses, not decisions. Re-verify at their own layer before re-asserting, surface a suggested deferral to the user rather than accepting it silently, and settle a negative claim ("this guard is untested") by stripping the guard and running the suite.
-- Before treating something as unsettled scope, or filing the follow-up ticket a plan asks for, check the plan's own Open Questions section and search the tracker — the point may already be resolved there, or ticketed during sign-off in different words.
+*Populated automatically after each session. Do not edit manually. Keep entries generic — no private or commercial specifics. Cap this section at ~12 entries of 1-2 lines each — every entry is read on every run; when adding, merge or drop older entries rather than growing the list.*

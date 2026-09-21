@@ -196,8 +196,7 @@ After the session ends (plan approved, or user abandons), reflect on how the pla
 2. **Update this skill file** if a learning is general enough to apply to future sessions:
    - Add it to the **## Learnings** section below.
    - Only add it if it would change the plan output or exploration approach for a future ticket.
-   - Keep the section compact: at most ~12 entries of 1-2 lines each; merge or drop older entries rather than growing the list.
-   - If the learning only applies to changes touching a database, queries, concurrency or access control, add it to `learnings-data-layer.md` in this skill's directory instead, under the same size rule.
+   - Keep the section compact: at most ~12 entries of 1-2 lines each — every entry is read on every run; merge or drop older entries rather than growing the list.
 
 3. Do **not** record ticket-specific implementation details — only methodology improvements. Keep learnings free of any private or commercial specifics.
 
@@ -209,17 +208,14 @@ After the session ends (plan approved, or user abandons), reflect on how the pla
 - If the ticket has no scenario list, derive scenarios from the acceptance criteria.
 - Do not begin any implementation work in this skill — planning only.
 - Open questions should be resolved with the human during the iteration loop, not deferred to implementation.
+- The ticket's description is not the whole requirement set. Read its comments before each review round, and treat already-shipped blocker tickets as rules the new work must live under.
+- Treat every claim in the ticket as something to check in the code, including "model it on <existing feature>" — that imports the feature's gaps too, so say which differences are deliberate.
+- Follow the nearest existing precedent for names and shapes rather than inventing new ones. If the ticket uses one word for two things, settle the vocabulary with the human before the plan hardens.
+- When adding a value to an enum, role or state set, list every place the set is spelled out. A `default` branch that *does something* instead of refusing quietly gives the new value behaviour nobody chose.
+- A generalising answer from the human ("apply that everywhere") is a scope change, not a confirmation: list everything it now reaches, decide each in or out, and re-run the review.
 
 ---
 
 ## Learnings
 
 *Populated automatically after each session. Do not edit manually. Keep entries generic — no private or commercial specifics.*
-
-If the change touches a database, queries, concurrency or access control, also read `learnings-data-layer.md` in this skill's directory (skip silently if it isn't installed).
-
-- The ticket's description is not the whole requirement set. Re-fetch its comments before each review round, and read every already-shipped blocker ticket as rules the new work has to live under — a rule shipped earlier routinely makes the headline scenario unreachable, which is a product question for Step 5 rather than something to quietly implement around.
-- Treat every assertion in a ticket as a claim to grep — including "model it on <existing feature>", which silently imports that feature's gaps, so read the clone source against the *new* acceptance criteria line by line and say which deviations are deliberate. Housekeeping claims lie too: "just regenerate the client" assumes a checked-in artefact is current, and a stale one turns a one-line step into a large unrelated diff better raised as its own ticket.
-- Never propose a name, route shape or authorization primitive from first principles — grep the nearest precedent, follow it, and cite the count ("13 comparable fields carry no type, 1 does"). When a ticket uses one word for two concepts ("user" meaning both an account and the person behind it), settle the vocabulary with the user before the plan hardens; it names types, functions and routes across several tickets.
-- Adding a value to a role or state enum means auditing every place that set is spelled out — switches, list literals, hand-written SQL predicates, validation rules — and counting the sites in the plan. A `default:` arm that *does something* rather than refusing fails open, granting the new value a behaviour or privilege by accident.
-- When a human answers an open question with a generalising phrase ("same for anything with a description", "apply that rule everywhere"), treat it as a scope change rather than a confirmation: enumerate every field or call site the rule now reaches, decide each in or out, write the exclusions into the plan with their reasons, and re-run the review — the new scenario has been looked at by nobody.

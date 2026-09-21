@@ -136,8 +136,7 @@ After each use, reflect on the review:
 2. **Update this skill file** if a learning generalises beyond this ticket:
    - Add it to the **## Learnings** section below.
    - Only add it if it would change how a future plan is reviewed.
-   - Keep the section compact: at most ~30 entries of 1-3 lines each. Before adding, look for an entry the new one overlaps and merge into it; drop the least useful entry rather than growing the list. Every entry is read on every run, so length costs each future review.
-   - If the learning only applies to changes touching a database, queries, concurrency or access control, add it to `learnings-data-layer.md` in this skill's directory instead, under the same size rule.
+   - Keep the section compact: at most ~12 entries of 1-2 lines each — every entry is read on every run; merge or drop older entries rather than growing the list.
 
 3. Do **not** record ticket-specific plan details. Keep learnings free of any private or commercial specifics.
 
@@ -148,25 +147,16 @@ After each use, reflect on the review:
 - Be specific about *where* in the plan a gap exists — quote the plan section if helpful.
 - Do not penalise partial (⚠️) items if the ticket itself defers them to a follow-up or an out-of-diff mechanism.
 - Focus on correctness and completeness, not style.
+- Verify the plan's checkable claims yourself — "nothing calls this", "no test asserts that", call-site counts — by searching the code, test files included. Plans get these wrong often, and usually undercount.
+- Don't trust the plan's list of tests that will break; search for the old value or assertion. A plan naming zero breaking tests is a reason to look harder.
+- For each proposed test, ask whether it would fail if the change were absent. A too-permissive fixture passes either way.
+- Read an end-to-end test as a script, checking each step against the state the previous one leaves behind.
+- On a second pass, check each fix's reach, not just its presence: look for sibling code paths the revision didn't extend to.
+- When the plan makes previously-legal state illegal, search the tests for fixtures that create it — they break far from the feature.
+- If a key property depends on a setting outside the repository (a cloud permission, a third-party toggle), no test can prove it: require a recorded manual check.
 
 ---
 
 ## Learnings
 
 *Populated automatically after each use. Do not edit manually. Keep entries generic — no private or commercial specifics.*
-
-If the change touches a database, queries, concurrency or access control, also read `learnings-data-layer.md` in this skill's directory (skip silently if it isn't installed).
-
-- Verify every checkable absence claim yourself — "no test asserts this", "the artefact is not checked in", "this helper has no callers", "the builder has no such function". Each takes seconds to grep, plans get them wrong, and instructions written around a false absence land nowhere, silently.
-- Re-run the plan's call-site counts with `grep -c`, one helper at a time, across every package including test packages. Plans under-count badly and directionally: the helper a plan calls "unchanged" often owns most of the sites, so its "mechanical churn" commit is where the risk lives.
-- Do not accept a plan's names for the tests it says will break — grep for the old value or assertion. Plans name a plausible test that has no such assertion while missing the real one, often a count assertion that breaks silently. A plan naming zero breaking tests is itself the signal to go looking.
-- On a second pass, check the *scope* of each fix, not just its presence: read the paths it claims to cover and look for sibling paths the revision did not extend to. On a rework against a rewritten ticket, check the AC mapping names each superseded criterion and says why, not silently renumbering around it.
-- For every test a plan proposes, ask whether it would fail if the change were absent. A permissive-default fixture, a viewer subscribed to nothing, tied rows that land inside one page — each makes the assertion pass with or without the guard under test.
-- When a plan says an existing test "must be flipped" to the opposite status, read its fixture, not its name: if it builds the permissive default the new gate never fires, and the right change is a new test with the restrictive fixture. When flipping deny→allow, check what coverage that assertion was the only source of.
-- Read a plan's end-to-end test as a linear script, re-evaluating each step against the state the previous one leaves. Fixes to one step routinely invalidate a later assertion — a teardown that a newly created dependent now blocks, or a now-succeeding delete that cascades away the row a later step reads back.
-- When a plan adds the first audit/log row to a function that wrote none, grep for a test asserting that absence, and for exact row-count assertions in every suite sharing a helper on that path. Both contradict the plan directly and are routinely missing from its change list.
-- Never accept an instruction to delete a line range from a test file. Print the file's test-function lines with numbers and check the range's endpoints land on function boundaries — ranges routinely orphan a header and swallow cases the plan's own prose says survive. Ask for deletions named by function.
-- When a plan satisfies "adding a new enum value must fail a test", trace what happens to an unclassified value: a switch with no default falls through to a named branch, and a table-driven walk still needs a failing default in the per-value fixture builder. Asserting the case lists union to the canonical list fails closed.
-- When a race is called harmless because the final row state is deterministic, check what the losing request already returned and wrote: a committed 2xx, or a permanent public audit row for a state that no longer exists, is a real defect the "final state" framing hides.
-- When a plan makes previously-legal state illegal, grep the tests for fixtures that create it — suites rely on it casually as setup noise and break far from the feature. Check whether the shared setup helper swallows errors too, since the refusal then surfaces as a panic pages away from its cause.
-- For a plan whose central security property depends on a setting outside the repository — an identity-provider toggle, a cloud IAM policy, a database privilege — require a blocking, recorded step, and say plainly in the review that no test or CI job can verify it.
