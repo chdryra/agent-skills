@@ -31,7 +31,7 @@ The reviewing seat's job is simple and repetitive, and every lapse in it has the
 
 1. If the argument is a batch name, read `.context/pr-suite/<batch-name>/state.md` (written by `create-batch`, extended by `plan-batch`): tickets, implement/review models, order and dependency notes. If the file is missing, rebuild the ticket list from the tracker label of that name.
 2. Otherwise build the same state from the arguments: for each ticket id, find its PR with `gh pr list --repo <owner/repo> --search "<ticket-id> in:title,body" --state open`; for each PR number, read its title to find the ticket.
-3. Fill in, per ticket: PR number (or `awaiting PR`), head branch, review model (from the plan's "Suggested model", the ticket, `--review-model`, or the session model), dependencies (tracker blocking links plus the plan's notes), status (`awaiting PR` / `under review` / `changes requested` / `green` / `merged` / `blocked`).
+3. Fill in, per ticket: PR number (or `awaiting PR`), head branch, implement and review models (from the state file; else the plan's or the ticket's "Suggested model" line; else `--review-model`; else ask once. Never the session model by default), dependencies (tracker blocking links plus the plan's notes), status (`awaiting PR` / `implementing` / `under review` / `changes requested` / `green` / `merged` / `blocked`). Also `plans_dir:` from the state file (written by `plan-batch`), else memory, else ask once.
 4. Detect the repo's merge convention (`--merge-method`, else look at recent merge commits: merge commits → `--merge`, squashed history → `--squash`).
 
 Write it all to the state file. Every later step reads and updates this file, not the conversation.
@@ -45,7 +45,7 @@ One background sub-agent per ticket, all launched in the same step for the ticke
 For each ready ticket:
 
 1. Spawn a background sub-agent **in an isolated worktree** (the agent tool's worktree isolation), at the ticket's **implement model** from the state file. Never let it inherit the session model by default.
-2. Before it starts, the worktree needs the files git does not carry: the plan and the local-only files the repo's workspace tooling would copy. Tell the agent, in its prompt, the absolute path of the plan (`<plans-dir>/<ticket-id>.md`) and of the ticket cache (`.context/pr-suite/<ticket-id>/ticket.md`) in this workspace, and the repo's files-to-copy list (`.worktreeinclude`, a Conductor `file_include_globs`, or the `.env*` default), and have it copy them into its worktree first.
+2. Before it starts, the worktree needs the files git does not carry: the plan and the local-only files the repo's workspace tooling would copy. Tell the agent, in its prompt, the absolute path of the plan (`<plans_dir>/<ticket-id>.md`, from the state file) and of the ticket cache (`.context/pr-suite/<ticket-id>/ticket.md`) in this workspace, and the repo's files-to-copy list (`.worktreeinclude`, a Conductor `file_include_globs`, or the `.env*` default), and have it copy them into its worktree first.
 3. The prompt, in substance:
 
    > Run the `implement-pr` skill for `<ticket-id>` in your current worktree (it is an isolated workspace you did not create: use it as is, do not add another). Copy `<plan path>` to `.claude/plans/<ticket-id>.md` and `<ticket cache path>` to `.context/pr-suite/<ticket-id>/ticket.md` first, plus these local files: `<list>`. Follow the skill to the end, including its post-merge steps. If a decision needs the human, send one clear question to `main` and wait for the answer; do not guess on anything the plan leaves open. Report the PR number as soon as it is open, the worktree path, and when the PR has merged.
@@ -61,7 +61,7 @@ Why sub-agents and not separate windows: each gets its own context and model, th
 ## Step 2 — Watch for PRs and events
 
 - For each PR that exists, start `monitor-pr` and capture the task id. For tickets still `awaiting PR`, check `gh pr list` when another event fires or roughly every twenty minutes; do not poll faster than that.
-- Monitors and shell watchers expire (typically after 30 and 10 minutes). When one expires, **re-arm it**; a silent monitor is the most common way a green PR sits unmerged.
+- `monitor-pr` runs persistently and sends a `heartbeat` event about every 30 minutes. Two signals mean it has died: a task notification with `status: killed`, or heartbeats that stop arriving when you would expect them. On either, **re-invoke `monitor-pr <pr#>` at once** without asking; its on-disk state means no events are replayed. A dead monitor is the most common way a green PR sits unmerged.
 - Stay idle between events. Do not narrate waiting. When the human asks "where are we?", answer from the state file as a short table.
 
 ---
@@ -73,6 +73,8 @@ When a PR opens or its head changes:
 1. Check dependencies first. If the ticket is blocked by a sibling that is not merged, review it anyway if you like, but mark it `blocked` and do not merge until the sibling lands. Never suggest rebasing one unmerged branch onto another.
 2. Run `review-pr <pr#>` in a sub-agent at the PR's review model. `review-pr` posts the coverage review on the PR itself; the sub-agent returns only the verdict and any gaps. Use a different model from the one that implemented the code where you can.
 3. If the review found gaps: leave it. `implement-pr`'s own monitor reads the review comment and fixes it; when the head SHA changes, re-review (the `review-pr` delta mode means this is cheap). Mark `changes requested`.
+   - **If the implementing agent is no longer running** (its task has finished, or a message to it fails), nobody will fix the gaps. Relaunch: a new background sub-agent on the **same worktree and branch**, at the ticket's implement model, told to resume `implement-pr` for the ticket from its state file (`.context/pr-suite/<ticket-id>/state.md`) and address the review comment. Record the new agent id. Confirm on the first real batch whether background implementers stay alive through `implement-pr`'s PR-monitoring phase; if they do not, this relaunch is the normal path rather than the exception, and the same applies to the post-merge chores in Step 5.
+   - **Skip the re-review when the new head is only a merge of the default branch** (a single merge or bot commit with no change of its own, which is what Step 4.4 produces). `review-pr --watch` makes the same check; with several PRs in flight this saves a review sub-agent per merge per PR.
 4. If the review is clean: mark `under review → green` once CI passes. Never merge on a review alone.
 5. If a PR has been open with no activity for a long time, or the ticket is multi-PR and the implementing session stopped after its first PR, tell the human which workspace needs a nudge. The reviewing seat does not push to another workspace's branch.
 
@@ -125,10 +127,9 @@ After the batch closes, reflect: an event the monitor missed; a merge that shoul
 
 - **Never merge red, unreviewed, or ahead of a blocker.** Those are the three rules; everything else is bookkeeping.
 - **Branches belong to their implementing agents.** The reviewing seat updates branches through GitHub and merges; it does not resolve conflicts or push commits to a branch an implementing agent is working on. A conflict goes back to that agent (by its id) as a message.
-- **Models are per ticket and never inherited.** Implementing agents run at the ticket's implement model; reviews at its review model; the stronger review model for anything touching auth, permissions, transactions or privacy regardless.
 - **Re-arm expired monitors.** Treat a long silence as a question, not as good news.
 - **The state file is the memory.** Everything the human might ask ("why isn't 223 merged?") must be answerable from it after a context reset.
-- **Model choice:** the stronger review model for anything touching auth, permissions, transactions or privacy, regardless of who implemented it; the cheaper one is fine for docs, CI and renames.
+- **Models are per ticket and never inherited.** Implementing agents run at the ticket's implement model and reviews at its review model, both from the state file or the ticket; if neither says, ask once rather than defaulting to the session model. The stronger review model for anything touching auth, permissions, transactions or privacy, regardless of who implemented it; the cheaper one is fine for docs, CI and renames.
 - An `implement-pr` run ends after one PR. A ticket that needs several PRs needs a nudge per PR: send it to the agent by id as soon as the first PR merges (or tell the human, under `--no-launch`).
 
 ---

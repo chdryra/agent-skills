@@ -1,7 +1,7 @@
 ---
 name: plan-pr
 description: Plan the implementation of a ticket. Fetches the ticket from your issue tracker, explores the codebase, produces a structured implementation plan, optionally has it critiqued by the review-plan skill, and loops with you until you're satisfied. Writes the approved plan to .claude/plans/<ticket-id>.md for use by implement-pr.
-argument-hint: <ticket-id>
+argument-hint: <ticket-id> [--batch]
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, Skill
 ---
 
@@ -140,7 +140,18 @@ The third argument is the ticket cache from Step 1 — it saves the reviewer a f
 
 **If `review-plan` is not installed**, perform the review inline: re-read the ticket and the plan, and for each ticket scenario/acceptance criterion check coverage (covered / partial / missing) and note any risks. Produce the same sign-off (**APPROVED** / **CHANGES NEEDED**) yourself.
 
-**IMPORTANT: do not end your response after the review.** Continue immediately to Step 5 in the same response turn — the review output appears inline and must be followed by the Step 5 presentation and question before handing control back to the user.
+**IMPORTANT: do not end your response after the review** (except in batch mode, below). Continue immediately to Step 5 in the same response turn — the review output appears inline and must be followed by the Step 5 presentation and question before handing control back to the user.
+
+
+### Batch mode (`--batch`)
+
+When invoked with `--batch` (as `plan-batch` does, one planner per ticket in parallel), there is no human in this conversation to present to. So after Step 4:
+
+- if the review returned **CHANGES NEEDED** and the fixes are unambiguous (a missed scenario the ticket spells out, a wrong file name), apply them and re-run the review, up to three rounds in all;
+- leave every genuine choice as an entry in the plan's "Open questions" section, each with your own one- or two-sentence recommendation and reason;
+- then **stop**. Do not perform Steps 5–7: do not present the plan, do not ask for confirmation, do not append a sign-off. Return a short summary instead: the plan path, the final review status, the open questions with recommendations, and anything in the ticket you found to be wrong or already done.
+
+The human answers the open questions later, through `plan-batch`, one at a time.
 
 ---
 
