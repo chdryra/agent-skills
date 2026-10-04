@@ -1,15 +1,15 @@
 ---
 name: create-batch
-description: Pick the next batch of tickets to work on and save it under a name. Reads the tracker's backlog, drops anything parked or blocked by unmerged work, orders the rest by priority, how much each unblocks, and age, fills the requested number of slots while avoiding tickets that clash, shows you the pick with a reason per ticket, and on your confirmation saves the batch (and labels the tickets) so plan-batch and finish-batch can run on the name alone. Use before plan-batch when you want the model to propose the batch rather than typing ticket ids.
+description: Pick the next batch of tickets to work on and save it under a name. Reads the tracker's backlog, drops anything parked or blocked by unmerged work, orders the rest by priority, how much each unblocks, and age, fills the requested number of slots while avoiding tickets that clash, shows you the pick with a reason per ticket, and on your confirmation saves the batch (and labels the tickets) so plan-batch and deliver-batch can run on the name alone. Use before plan-batch when you want the model to propose the batch rather than typing ticket ids.
 argument-hint: [<batch-name>] [--size <n>] [--from <label|project|cycle>] [--include <ids>] [--exclude <ids>] [--min-priority urgent|high|medium|low]
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep
 ---
 
 # create-batch
 
-Choose the next few tickets and give the batch a name. Everything downstream (`plan-batch <name>`, `finish-batch <name>`) then works from that name.
+Choose the next few tickets and give the batch a name. Everything downstream (`plan-batch <name>`, `deliver-batch <name>`) then works from that name.
 
-Part of the **PR suite**. Needs an issue tracker; writes the state file that `plan-batch` and `finish-batch` read.
+Part of the **PR suite**. Needs an issue tracker; writes the state file that `plan-batch` and `deliver-batch` read.
 
 **Usage:**
 ```
@@ -90,7 +90,7 @@ If the human swaps, re-check the clash rules for the new set and show the table 
 On confirmation:
 
 1. Write `.context/pr-suite/<batch-name>/state.md`: the batch name, the date, the ticket list in slot order, per-ticket implement and review models (from the tickets' own "Suggested model" lines, else: cheaper model when the ticket is fully specified at file level, stronger model otherwise), dependency and shared-file notes from Step 2, and `status: created`. Where plans are copied for the implementation workspaces is `plan-batch`'s concern, not this skill's. Every later skill reads this file.
-2. If the tracker supports labels, add a `<batch-name>` label to each ticket (create it if needed). This makes the batch visible outside the chat and lets `plan-batch`/`finish-batch` rebuild the state file from the tracker if `.context/` is lost. Do not change ticket states; `plan-pr` moves tickets to in-progress when planning starts.
+2. If the tracker supports labels, add a `<batch-name>` label to each ticket (create it if needed). This makes the batch visible outside the chat and lets `plan-batch`/`deliver-batch` rebuild the state file from the tracker if `.context/` is lost. Do not change ticket states; `plan-pr` moves tickets to in-progress when planning starts.
 3. Reply with one line: "Batch `<name>` saved with N tickets. Run `/plan-batch <name>` to plan it."
 
 ---

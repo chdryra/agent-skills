@@ -74,7 +74,7 @@ A package of eight `SKILL.md` skills that take a ticket from plan → implementa
 | `pr-suite/monitor-pr` | `/monitor-pr` | Event-driven PR monitor (comments, CI, merge state, SHA) |
 | `pr-suite/create-batch` | `/create-batch` | Pick and name the next batch of tickets from the backlog by a fixed, explained rule; you confirm or swap before it is saved |
 | `pr-suite/plan-batch` | `/plan-batch` | Plan a named batch: parallel `plan-pr` runs, then sign-off questions one at a time, then a table of `/implement-pr` commands |
-| `pr-suite/finish-batch` | `/finish-batch` | The reviewing seat for a batch: review each PR, merge in dependency order, keep branches up to date, close the batch out |
+| `pr-suite/deliver-batch` | `/deliver-batch` | The reviewing seat for a batch: review each PR, merge in dependency order, keep branches up to date, close the batch out |
 
 ### Bug fixing
 
