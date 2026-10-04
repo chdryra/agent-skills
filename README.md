@@ -63,7 +63,7 @@ Each audit skill is self-contained — install any subset you want.
 
 #### PR suite (`workflow/pr-suite/`)
 
-A package of five `SKILL.md` skills that take a ticket from plan → implementation → review → merge. Each is independently installable; cross-references between them are soft (optional). Works with GitHub PRs and an auto-detected issue tracker (Linear / Jira / GitHub Issues). See `workflow/pr-suite/README.md`.
+A package of seven `SKILL.md` skills that take a ticket from plan → implementation → review → merge, singly or as a batch. Each is independently installable; cross-references between them are soft (optional). Works with GitHub PRs and an auto-detected issue tracker (Linear / Jira / GitHub Issues). See `workflow/pr-suite/README.md`.
 
 | Skill | Command | What it does |
 |---|---|---|
@@ -72,6 +72,8 @@ A package of five `SKILL.md` skills that take a ticket from plan → implementat
 | `pr-suite/implement-pr` | `/implement-pr` | Implement an approved plan, open the PR, autofix review/CI feedback |
 | `pr-suite/review-pr` | `/review-pr` | Review a PR against its ticket; `--watch` re-reviews on new commits |
 | `pr-suite/monitor-pr` | `/monitor-pr` | Event-driven PR monitor (comments, CI, merge state, SHA) |
+| `pr-suite/plan-batch` | `/plan-batch` | Plan several tickets at once: parallel `plan-pr` runs, then sign-off questions one at a time, then a table of `/implement-pr` commands |
+| `pr-suite/merge-batch` | `/merge-batch` | The reviewing seat for a batch: review each PR, merge in dependency order, keep branches up to date, close the batch out |
 
 ### Bug fixing
 

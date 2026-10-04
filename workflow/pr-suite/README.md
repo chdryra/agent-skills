@@ -1,6 +1,6 @@
 # PR suite
 
-A set of skills that take a ticket from plan → implementation → review → merge, reacting to PR events along the way.
+A set of skills that take a ticket from plan → implementation → review → merge, reacting to PR events along the way. Two batch skills sit on top for when several tickets move together: one planning seat, one implementation session per ticket, one reviewing-and-merging seat.
 
 ```
 plan-pr  ──▶  implement-pr  ──▶  (PR opened)  ──▶  monitor-pr  ──▶  review-pr
@@ -16,6 +16,8 @@ plan-pr  ──▶  implement-pr  ──▶  (PR opened)  ──▶  monitor-pr 
 | `implement-pr` | `/implement-pr <ticket-id>` | Implement an approved plan on a branch, validate locally, open the PR, then monitor and autofix review comments + CI failures. |
 | `review-pr` | `/review-pr <pr#> [--watch]` / `--local <ticket-id> [--full]` | Review a PR against its ticket and post a structured coverage review; `--watch` re-reviews on new commits; `--local` reviews the branch diff without posting (delta by default, `--full` for the whole diff). |
 | `monitor-pr` | `/monitor-pr <pr#>` | Start an event-driven monitor on a PR (comments, CI, merge state, SHA). Setup only — the caller owns the reaction logic. |
+| `plan-batch` | `/plan-batch <ticket-id>[:<model>] ...` | Plan several tickets at once: one `plan-pr` sub-agent per ticket in parallel, wait for all, then the open questions one at a time, sign-off notes on the tickets, plans copied where the implementation workspaces look, and a table of `/implement-pr` commands and models. |
+| `merge-batch` | `/merge-batch <batch-slug> \| <ticket-or-pr> ...` | The reviewing seat for a batch of PRs implemented elsewhere: review each with `review-pr`, merge in dependency order once green, keep the remaining branches up to date, verify (not redo) the implementing sessions' post-merge chores, close the batch out. |
 
 ## Pick-and-mix vs. the full package
 
@@ -24,6 +26,7 @@ These skills cross-reference each other, but each is **independently installable
 - `plan-pr` spawns `review-plan` if it's installed; otherwise it reviews the plan inline.
 - `implement-pr` uses `review-pr --local` if it's installed; otherwise it checks coverage inline. It starts `monitor-pr` if installed; otherwise it tells you to watch the PR manually.
 - `review-pr --watch` needs `monitor-pr`; without it, the one-shot review still works.
+- `plan-batch` needs `plan-pr` (and uses `review-plan` if present). `merge-batch` needs `review-pr` and `monitor-pr`, and reads `plan-batch`'s state file if there is one, but can be given tickets or PR numbers directly.
 - `implement-pr` logs the merged ticket via a `/journal`-style skill if one is installed; otherwise it skips that step.
 - `implement-pr` brings the repo's docs back in line via a docs-sync skill (one that catches a documentation set up with merged PRs) if one is installed; otherwise it skips that step.
 
