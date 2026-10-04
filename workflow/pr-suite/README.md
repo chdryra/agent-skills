@@ -1,6 +1,6 @@
 # PR suite
 
-A set of skills that take a ticket from plan → implementation → review → merge, reacting to PR events along the way. Three batch skills sit on top for when several tickets move together: `create-batch` picks and names the batch, `plan-batch` plans it, each ticket is implemented in its own session, and `deliver-batch` is the reviewing-and-merging seat. All three work from the batch name.
+A set of skills that take a ticket from plan → implementation → review → merge, reacting to PR events along the way. Three batch skills sit on top for when several tickets move together: `create-batch` picks and names the batch, `plan-batch` plans it, and `deliver-batch` launches one `implement-pr` agent per ticket in its own worktree and then reviews and merges them. All three work from the batch name; the human types three short commands and answers questions.
 
 ```
 plan-pr  ──▶  implement-pr  ──▶  (PR opened)  ──▶  monitor-pr  ──▶  review-pr
@@ -18,7 +18,7 @@ plan-pr  ──▶  implement-pr  ──▶  (PR opened)  ──▶  monitor-pr 
 | `monitor-pr` | `/monitor-pr <pr#>` | Start an event-driven monitor on a PR (comments, CI, merge state, SHA). Setup only — the caller owns the reaction logic. |
 | `create-batch` | `/create-batch [<name>] [--size n]` | Pick the next batch from the tracker's backlog by a fixed rule (priority, how much each ticket unblocks, age; skipping parked, blocked and clashing tickets), show the pick with reasons, and on confirmation save it under a name and label the tickets. |
 | `plan-batch` | `/plan-batch <batch-name>` | Plan several tickets at once: one `plan-pr` sub-agent per ticket in parallel, wait for all, then the open questions one at a time, sign-off notes on the tickets, plans copied where the implementation workspaces look, and a table of `/implement-pr` commands and models. |
-| `deliver-batch` | `/deliver-batch <batch-name>` | The reviewing seat for a batch of PRs implemented elsewhere: review each with `review-pr`, merge in dependency order once green, keep the remaining branches up to date, verify (not redo) the implementing sessions' post-merge chores, close the batch out. |
+| `deliver-batch` | `/deliver-batch <batch-name> [--no-launch]` | Take a signed-off batch to merged: launch one `implement-pr` sub-agent per ticket in its own isolated worktree at the ticket's model (or `--no-launch` to start them yourself), then review each PR with `review-pr`, merge in dependency order once green, keep the remaining branches up to date, verify (not redo) the post-merge chores, close the batch out. |
 
 ## Pick-and-mix vs. the full package
 
@@ -27,7 +27,7 @@ These skills cross-reference each other, but each is **independently installable
 - `plan-pr` spawns `review-plan` if it's installed; otherwise it reviews the plan inline.
 - `implement-pr` uses `review-pr --local` if it's installed; otherwise it checks coverage inline. It starts `monitor-pr` if installed; otherwise it tells you to watch the PR manually.
 - `review-pr --watch` needs `monitor-pr`; without it, the one-shot review still works.
-- `create-batch` only needs a tracker. `plan-batch` needs `plan-pr` (and uses `review-plan` if present) and reads `create-batch`'s state file, or takes ticket ids directly. `deliver-batch` needs `review-pr` and `monitor-pr`, reads the same state file, or takes tickets or PR numbers directly.
+- `create-batch` only needs a tracker. `plan-batch` needs `plan-pr` (and uses `review-plan` if present) and reads `create-batch`'s state file, or takes ticket ids directly. `deliver-batch` needs `implement-pr`, `review-pr` and `monitor-pr`, reads the same state file, or takes tickets or PR numbers directly.
 - `implement-pr` logs the merged ticket via a `/journal`-style skill if one is installed; otherwise it skips that step.
 - `implement-pr` brings the repo's docs back in line via a docs-sync skill (one that catches a documentation set up with merged PRs) if one is installed; otherwise it skips that step.
 

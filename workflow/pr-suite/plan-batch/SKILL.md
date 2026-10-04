@@ -116,7 +116,7 @@ End with one table the human can work from without reading anything else:
 
 - Implement and review models come from the tickets' own "Suggested model" lines if they have them, else from the planner's judgment. Anything touching auth, permissions, transactions or privacy gets the stronger review model regardless of who implements.
 - "Order / notes" carries every dependency and shared-file warning from Step 0. Say plainly when a ticket must **wait for a merge** rather than be started now; stacking a ticket's branch on an unmerged sibling is not an option to offer.
-- Close with one sentence: run each command in its own workspace or worktree, tell me when they are launched, and I will run `/deliver-batch <batch-name>` to review and merge them.
+- Close with one sentence: `/deliver-batch <batch-name>` will launch these, review and merge them; or run each command yourself in its own workspace and use `/deliver-batch <batch-name> --no-launch`.
 
 Update the batch state file to `status: signed-off` with the table, so `deliver-batch <batch-name>` can read it.
 
