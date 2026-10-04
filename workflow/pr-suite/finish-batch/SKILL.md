@@ -1,21 +1,21 @@
 ---
-name: merge-batch
+name: finish-batch
 description: Review and merge a batch of PRs from the reviewing seat while separate implementation sessions do the coding. Finds the PR for each ticket, reviews it with review-pr at the agreed model, leaves gaps for the implementing session to fix, waits for green CI, merges in dependency order, brings the remaining branches up to date, verifies (rather than redoes) the implementing sessions' post-merge chores, and closes the batch out. Use after plan-batch, once the implementations have been launched.
 argument-hint: <batch-name> | <ticket-id-or-pr#> ... [--review-model <model>] [--merge-method merge|squash|rebase]
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, Skill
 ---
 
-# merge-batch
+# finish-batch
 
-Run the reviewing seat for a batch: one session that reviews, merges and keeps the branches in step, while each ticket is implemented elsewhere by `implement-pr`.
+Take a batch from "implementations launched" to "everything merged and closed out". Run the reviewing seat for a batch: one session that reviews, merges and keeps the branches in step, while each ticket is implemented elsewhere by `implement-pr`.
 
 Part of the **PR suite**. Uses `review-pr` and `monitor-pr`; reads the state file `create-batch` and `plan-batch` leave behind. Works without them too: give it tickets or PR numbers.
 
 **Usage:**
 ```
-/merge-batch batch-e
-/merge-batch PROJ-12 PROJ-13 PROJ-15 --review-model opus
-/merge-batch 231 232 233 --merge-method squash
+/finish-batch batch-e
+/finish-batch PROJ-12 PROJ-13 PROJ-15 --review-model opus
+/finish-batch 231 232 233 --merge-method squash
 ```
 
 ---

@@ -9,7 +9,7 @@ allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, Skill
 
 Plan several tickets in one sitting. Each ticket gets its own planning sub-agent running `plan-pr`; you only get involved once every plan is drafted, and then one question at a time.
 
-Part of the **PR suite**. Needs `plan-pr`; uses `review-plan` if installed. Usually follows `create-batch`, which chose the tickets and saved the batch under a name; `merge-batch` takes over once the implementations are launched.
+Part of the **PR suite**. Needs `plan-pr`; uses `review-plan` if installed. Usually follows `create-batch`, which chose the tickets and saved the batch under a name; `finish-batch` takes over once the implementations are launched.
 
 **Usage:**
 ```
@@ -116,9 +116,9 @@ End with one table the human can work from without reading anything else:
 
 - Implement and review models come from the tickets' own "Suggested model" lines if they have them, else from the planner's judgment. Anything touching auth, permissions, transactions or privacy gets the stronger review model regardless of who implements.
 - "Order / notes" carries every dependency and shared-file warning from Step 0. Say plainly when a ticket must **wait for a merge** rather than be started now; stacking a ticket's branch on an unmerged sibling is not an option to offer.
-- Close with one sentence: run each command in its own workspace or worktree, tell me when they are launched, and I will run `/merge-batch <batch-name>` to review and merge them.
+- Close with one sentence: run each command in its own workspace or worktree, tell me when they are launched, and I will run `/finish-batch <batch-name>` to review and merge them.
 
-Update the batch state file to `status: signed-off` with the table, so `merge-batch <batch-name>` can read it.
+Update the batch state file to `status: signed-off` with the table, so `finish-batch <batch-name>` can read it.
 
 ---
 
