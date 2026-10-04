@@ -1,7 +1,7 @@
 ---
 name: create-batch
 description: Pick the next batch of tickets to work on and save it under a name. Reads the tracker's backlog, drops anything parked or blocked by unmerged work, orders the rest by priority, how much each unblocks, and age, fills the requested number of slots while avoiding tickets that clash, shows you the pick with a reason per ticket, and on your confirmation saves the batch (and labels the tickets) so plan-batch and merge-batch can run on the name alone. Use before plan-batch when you want the model to propose the batch rather than typing ticket ids.
-argument-hint: [<batch-name>] [--size <n>] [--from <label|project|cycle>] [--include <ids>] [--exclude <ids>] [--min-priority urgent|high|medium|low] [--plans-dir <path>]
+argument-hint: [<batch-name>] [--size <n>] [--from <label|project|cycle>] [--include <ids>] [--exclude <ids>] [--min-priority urgent|high|medium|low]
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep
 ---
 
@@ -23,7 +23,6 @@ Part of the **PR suite**. Needs an issue tracker; writes the state file that `pl
 - `--from` — restrict the pool to a tracker label, project or cycle.
 - `--include` / `--exclude` — force tickets in or out before the rule runs.
 - `--min-priority` — ignore tickets below this priority.
-- `--plans-dir` — where approved plans must be copied for the implementation workspaces (saved into the state file for `plan-batch`).
 
 ---
 
@@ -37,7 +36,6 @@ Left to taste, a model picks whatever looks interesting or whatever it read most
 
 1. Detect the issue tracker the way `plan-pr` does (Linear MCP tools → Jira config → GitHub Issues → memory → ask).
 2. Look for an existing batch convention: state files under `.context/pr-suite/batch-*/`, tracker labels shaped like `batch-*`, and any note in memory or the repo's agent instructions about a planned next batch or a parked list. A recorded "next batch" plan takes precedence over the rule below; say so when you use it.
-3. Find the plans directory: `--plans-dir`, else memory, else leave blank and let `plan-batch` ask.
 
 ---
 
@@ -91,7 +89,7 @@ If the human swaps, re-check the clash rules for the new set and show the table 
 
 On confirmation:
 
-1. Write `.context/pr-suite/<batch-name>/state.md`: the batch name, the date, the ticket list in slot order, per-ticket implement and review models (from the tickets' own "Suggested model" lines, else: cheaper model when the ticket is fully specified at file level, stronger model otherwise), dependency and shared-file notes from Step 2, the plans directory, and `status: created`. Every later skill reads this file.
+1. Write `.context/pr-suite/<batch-name>/state.md`: the batch name, the date, the ticket list in slot order, per-ticket implement and review models (from the tickets' own "Suggested model" lines, else: cheaper model when the ticket is fully specified at file level, stronger model otherwise), dependency and shared-file notes from Step 2, and `status: created`. Where plans are copied for the implementation workspaces is `plan-batch`'s concern, not this skill's. Every later skill reads this file.
 2. If the tracker supports labels, add a `<batch-name>` label to each ticket (create it if needed). This makes the batch visible outside the chat and lets `plan-batch`/`merge-batch` rebuild the state file from the tracker if `.context/` is lost. Do not change ticket states; `plan-pr` moves tickets to in-progress when planning starts.
 3. Reply with one line: "Batch `<name>` saved with N tickets. Run `/plan-batch <name>` to plan it."
 

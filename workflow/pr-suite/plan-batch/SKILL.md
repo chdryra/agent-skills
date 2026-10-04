@@ -21,7 +21,7 @@ Part of the **PR suite**. Needs `plan-pr`; uses `review-plan` if installed. Usua
 - `<batch-name>` — a batch saved by `create-batch` in `.context/pr-suite/<batch-name>/state.md` (or, if that is missing, a tracker label of the same name). The ticket list, per-ticket models and plans directory all come from there, so nothing else needs typing.
 - `<ticket-id>:<model>` — the ad hoc form when there is no saved batch. The model is what the planning sub-agent runs on: the cheaper one when the ticket already spells out files, steps and acceptance criteria; the stronger one when design judgment is left. Default: the stronger model available to you. A slug is generated for the state file.
 - `--no-review` — skip the `review-plan` critique for the named tickets (sensible when the ticket itself was already verified line by line and the plan is short).
-- `--plans-dir` — where approved plans are copied for the implementation workspaces (see Step 5). With a saved batch this is already recorded; the flag overrides it.
+- `--plans-dir` — where approved plans are copied for the implementation workspaces (see Step 5). Normally not needed: the path is taken from memory or the repo's agent instructions.
 
 ---
 
@@ -33,7 +33,7 @@ Planning five tickets by hand means five `plan-pr` runs, each stopping to ask yo
 
 ## Step 0 — Load the batch and check it
 
-1. If the first argument is a batch name, read `.context/pr-suite/<batch-name>/state.md`; if it is missing, rebuild it from the tracker label of that name (ticket list only; models default as below). Take the ticket list, per-ticket planner models (use the recorded implement model as the planner model unless the state file names one), the plans directory and the dependency notes from there. Otherwise collect the ticket ids and models from the arguments and generate a slug.
+1. If the first argument is a batch name, read `.context/pr-suite/<batch-name>/state.md`; if it is missing, rebuild it from the tracker label of that name (ticket list only; models default as below). Take the ticket list, per-ticket planner models (use the recorded implement model as the planner model unless the state file names one) and the dependency notes from there. Otherwise collect the ticket ids and models from the arguments and generate a slug.
 2. Detect the issue tracker the way `plan-pr` does (Linear MCP tools → Jira config → GitHub Issues → memory → ask).
 3. For each ticket, fetch just enough to sanity-check: it exists, it is not already in review or done, and its blocking relations. Then warn about, but do not refuse:
    - a ticket blocked by something **outside** the batch that is not merged yet. Planning it is fine; implementing it is not until the blocker lands. Say so in the final table.
@@ -97,7 +97,7 @@ Once every question is answered and every review is APPROVED:
 
 `implement-pr` reads `.claude/plans/<ticket-id>.md` from the working tree it runs in. If implementations run in separate worktrees or workspaces created fresh from the default branch, that file will not be there unless something copies it. In order of preference:
 
-1. `--plans-dir <path>` if given, else the plans directory recorded in the batch state file: copy every signed-off plan there.
+1. `--plans-dir <path>` if given: copy every signed-off plan there.
 2. A plan-distribution path recorded in memory or in the repo's agent instructions (for example a note that a workspace tool copies `.claude/plans/*` from a root checkout into new workspaces). Use it.
 3. Otherwise, ask once: "Where should the plans go so the implementation workspaces can find them?" and remember the answer.
 
