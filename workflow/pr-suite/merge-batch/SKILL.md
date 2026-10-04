@@ -1,7 +1,7 @@
 ---
 name: merge-batch
 description: Review and merge a batch of PRs from the reviewing seat while separate implementation sessions do the coding. Finds the PR for each ticket, reviews it with review-pr at the agreed model, leaves gaps for the implementing session to fix, waits for green CI, merges in dependency order, brings the remaining branches up to date, verifies (rather than redoes) the implementing sessions' post-merge chores, and closes the batch out. Use after plan-batch, once the implementations have been launched.
-argument-hint: [<batch-slug> | <ticket-id-or-pr#> ...] [--review-model <model>] [--merge-method merge|squash|rebase]
+argument-hint: <batch-name> | <ticket-id-or-pr#> ... [--review-model <model>] [--merge-method merge|squash|rebase]
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, Skill
 ---
 
@@ -9,7 +9,7 @@ allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, Skill
 
 Run the reviewing seat for a batch: one session that reviews, merges and keeps the branches in step, while each ticket is implemented elsewhere by `implement-pr`.
 
-Part of the **PR suite**. Uses `review-pr` and `monitor-pr`; reads the state file `plan-batch` leaves behind if there is one. Works without `plan-batch` too: give it tickets or PR numbers.
+Part of the **PR suite**. Uses `review-pr` and `monitor-pr`; reads the state file `create-batch` and `plan-batch` leave behind. Works without them too: give it tickets or PR numbers.
 
 **Usage:**
 ```
@@ -28,7 +28,7 @@ The reviewing seat's job is simple and repetitive, and every lapse in it has the
 
 ## Step 0 — Load or build the batch
 
-1. If the argument is a batch slug, read `.context/pr-suite/<batch-slug>/state.md` from `plan-batch`: tickets, implement/review models, order and dependency notes.
+1. If the argument is a batch name, read `.context/pr-suite/<batch-name>/state.md` (written by `create-batch`, extended by `plan-batch`): tickets, implement/review models, order and dependency notes. If the file is missing, rebuild the ticket list from the tracker label of that name.
 2. Otherwise build the same state from the arguments: for each ticket id, find its PR with `gh pr list --repo <owner/repo> --search "<ticket-id> in:title,body" --state open`; for each PR number, read its title to find the ticket.
 3. Fill in, per ticket: PR number (or `awaiting PR`), head branch, review model (from the plan's "Suggested model", the ticket, `--review-model`, or the session model), dependencies (tracker blocking links plus the plan's notes), status (`awaiting PR` / `under review` / `changes requested` / `green` / `merged` / `blocked`).
 4. Detect the repo's merge convention (`--merge-method`, else look at recent merge commits: merge commits → `--merge`, squashed history → `--squash`).

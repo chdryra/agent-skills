@@ -1,7 +1,7 @@
 ---
 name: plan-batch
-description: Plan a batch of tickets at once. Runs plan-pr for every ticket in parallel (one sub-agent each, at a model you choose per ticket), waits for all of them, then walks you through the open questions one at a time, records each answer in the plan, signs the plans off, posts a sign-off note on each ticket, copies the plans wherever your implementation workspaces pick them up from, and ends with a table of /implement-pr commands and models. Use when you have several tickets to plan before a round of implementation.
-argument-hint: <ticket-id>[:<planner-model>] [<ticket-id>[:<planner-model>] ...] [--no-review <ticket-id>,...] [--plans-dir <path>]
+description: Plan a named batch of tickets at once. Reads the batch create-batch saved (or an explicit ticket list), runs plan-pr for every ticket in parallel (one sub-agent each, at the model recorded for it), waits for all of them, then walks you through the open questions one at a time, records each answer in the plan, signs the plans off, posts a sign-off note on each ticket, copies the plans wherever your implementation workspaces pick them up from, and ends with a table of /implement-pr commands and models. Use after create-batch, before a round of implementation.
+argument-hint: <batch-name> [--no-review <ticket-id>,...] | <ticket-id>[:<model>] ... [--plans-dir <path>]
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, Skill
 ---
 
@@ -9,18 +9,19 @@ allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, Skill
 
 Plan several tickets in one sitting. Each ticket gets its own planning sub-agent running `plan-pr`; you only get involved once every plan is drafted, and then one question at a time.
 
-Part of the **PR suite**. Needs `plan-pr`; uses `review-plan` if installed. Pairs with `merge-batch`, which takes over once the implementations are launched.
+Part of the **PR suite**. Needs `plan-pr`; uses `review-plan` if installed. Usually follows `create-batch`, which chose the tickets and saved the batch under a name; `merge-batch` takes over once the implementations are launched.
 
 **Usage:**
 ```
-/plan-batch PROJ-12 PROJ-13 PROJ-15
-/plan-batch PROJ-12:sonnet PROJ-13:sonnet PROJ-15:opus
-/plan-batch PROJ-12 PROJ-13 --no-review PROJ-12 --plans-dir ~/Dev/myrepo/.claude/plans
+/plan-batch batch-e                              # the normal form: a batch create-batch saved
+/plan-batch batch-e --no-review PROJ-12,PROJ-13  # skip the plan critique for fully specified tickets
+/plan-batch PROJ-12:sonnet PROJ-13:opus --plans-dir ~/Dev/myrepo/.claude/plans   # ad hoc, no create-batch
 ```
 
-- `<ticket-id>:<model>` — the model the planning sub-agent runs on. Pick the cheaper model when the ticket already spells out files, steps and acceptance criteria; the stronger one when design judgment is left. Default: the stronger model available to you.
+- `<batch-name>` — a batch saved by `create-batch` in `.context/pr-suite/<batch-name>/state.md` (or, if that is missing, a tracker label of the same name). The ticket list, per-ticket models and plans directory all come from there, so nothing else needs typing.
+- `<ticket-id>:<model>` — the ad hoc form when there is no saved batch. The model is what the planning sub-agent runs on: the cheaper one when the ticket already spells out files, steps and acceptance criteria; the stronger one when design judgment is left. Default: the stronger model available to you. A slug is generated for the state file.
 - `--no-review` — skip the `review-plan` critique for the named tickets (sensible when the ticket itself was already verified line by line and the plan is short).
-- `--plans-dir` — an extra directory to copy approved plans into (see Step 6).
+- `--plans-dir` — where approved plans are copied for the implementation workspaces (see Step 5). With a saved batch this is already recorded; the flag overrides it.
 
 ---
 
@@ -30,17 +31,17 @@ Planning five tickets by hand means five `plan-pr` runs, each stopping to ask yo
 
 ---
 
-## Step 0 — Parse the arguments and check the batch
+## Step 0 — Load the batch and check it
 
-1. Collect the ticket ids, their models, the `--no-review` set and `--plans-dir`.
+1. If the first argument is a batch name, read `.context/pr-suite/<batch-name>/state.md`; if it is missing, rebuild it from the tracker label of that name (ticket list only; models default as below). Take the ticket list, per-ticket planner models (use the recorded implement model as the planner model unless the state file names one), the plans directory and the dependency notes from there. Otherwise collect the ticket ids and models from the arguments and generate a slug.
 2. Detect the issue tracker the way `plan-pr` does (Linear MCP tools → Jira config → GitHub Issues → memory → ask).
 3. For each ticket, fetch just enough to sanity-check: it exists, it is not already in review or done, and its blocking relations. Then warn about, but do not refuse:
    - a ticket blocked by something **outside** the batch that is not merged yet. Planning it is fine; implementing it is not until the blocker lands. Say so in the final table.
    - two tickets in the batch where one blocks the other. Plan both, and put the order in the final table.
    - two tickets that touch the same files (if the tickets say so). Put the order in the final table.
-4. Choose a short batch slug (for example `batch-e` or the date) for the state file.
+4. In the ad hoc form, choose a short batch slug (for example the date) for the state file.
 
-Write `.context/pr-suite/<batch-slug>/state.md` with the ticket list, models, flags and a status column (`planning`). Update it as you go; it is what survives a context reset.
+Write or update `.context/pr-suite/<batch-name>/state.md` with the ticket list, models, flags and `status: planning`. Update it as you go; it is what survives a context reset.
 
 ---
 
@@ -96,7 +97,7 @@ Once every question is answered and every review is APPROVED:
 
 `implement-pr` reads `.claude/plans/<ticket-id>.md` from the working tree it runs in. If implementations run in separate worktrees or workspaces created fresh from the default branch, that file will not be there unless something copies it. In order of preference:
 
-1. `--plans-dir <path>` if given: copy every signed-off plan there.
+1. `--plans-dir <path>` if given, else the plans directory recorded in the batch state file: copy every signed-off plan there.
 2. A plan-distribution path recorded in memory or in the repo's agent instructions (for example a note that a workspace tool copies `.claude/plans/*` from a root checkout into new workspaces). Use it.
 3. Otherwise, ask once: "Where should the plans go so the implementation workspaces can find them?" and remember the answer.
 
@@ -115,9 +116,9 @@ End with one table the human can work from without reading anything else:
 
 - Implement and review models come from the tickets' own "Suggested model" lines if they have them, else from the planner's judgment. Anything touching auth, permissions, transactions or privacy gets the stronger review model regardless of who implements.
 - "Order / notes" carries every dependency and shared-file warning from Step 0. Say plainly when a ticket must **wait for a merge** rather than be started now; stacking a ticket's branch on an unmerged sibling is not an option to offer.
-- Close with one sentence: run each command in its own workspace or worktree, tell me when they are launched, and I will run `/merge-batch` to review and merge them.
+- Close with one sentence: run each command in its own workspace or worktree, tell me when they are launched, and I will run `/merge-batch <batch-name>` to review and merge them.
 
-Update the batch state file to `signed-off` with the table, so `merge-batch` can read it.
+Update the batch state file to `status: signed-off` with the table, so `merge-batch <batch-name>` can read it.
 
 ---
 
