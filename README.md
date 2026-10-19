@@ -14,7 +14,7 @@ Two formats live here:
 cp session/handoff.md ~/.claude/commands/
 cp analysis/explain-codebase.md ~/.claude/commands/
 
-# Audit skills — each is self-contained; copy any subset
+# Audit skills — copy the ones you want plus the shared protocol they all read
 cp audits/*.md ~/.claude/commands/
 
 # SKILL.md directories — copy the whole folder (keeps bundled scripts alongside)
@@ -32,7 +32,7 @@ cp -r workflow/pr-suite/review-pr ~/.claude/skills/  # or just one
 
 ### Audits
 
-Each audit skill is self-contained — install any subset you want.
+Each audit skill reads `audits/_audit-protocol.md` for the shared phases (scope, confirm, fix, report), so install that file alongside any subset. If the repo under audit keeps a *project rulebook* (a `review-rules.md` of standing rules with stable ids), the audit scopes itself to what changed since it last ran and every finding must cite a rule; the PR-suite skills read the same file.
 
 | File | Command | What it does |
 |---|---|---|

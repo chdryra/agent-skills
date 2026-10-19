@@ -64,7 +64,11 @@ If `$ARGUMENTS` is empty or contains no recognisable ticket ID, derive the goals
 
 After establishing requirements (either path), review them for anything ambiguous, underspecified, or likely to affect implementation approach — e.g. unclear acceptance criteria, missing edge cases, conflicting requirements, or decisions that belong to the human rather than the agent.
 
+Before asking, read the project rulebook if the repo has one (see below). A question a rule already answers is not asked: take the rule's answer and cite its id in the plan's "Rules touched" section.
+
 If there are any such questions, **ask them now** before exploring the codebase. Present them as a numbered list and wait for answers before continuing to Step 2.
+
+**Project rulebook.** A repo may keep one file of its standing rules, each with a stable id (`P3`, `D7`, `A12`): look for a file named `review-rules.md` under `docs/` or `*/docs/design/` (`git ls-files | grep -i review-rules.md`), or a path CLAUDE.md names for it. If the repo has none, skip every step below that mentions the rulebook.
 
 If the requirements are unambiguous and self-contained, say so briefly and proceed directly to Step 2.
 
@@ -120,9 +124,29 @@ For each scenario defined in the ticket:
 
 <Anything the ticket explicitly defers or marks out of scope for this PR>
 
+### Rules touched
+
+<Only when the repo has a rulebook.> One row per rule id the change brushes against, from the rulebook, CLAUDE.md or a design doc:
+
+| Rule | How the plan keeps it | What catches a slip |
+|---|---|---|
+| `P9` | <one sentence> | <the test or check, or "review"> |
+
+### Not doing
+
+<Only when the repo has a rulebook.> Things noticed and deliberately left, one line each, binned:
+- *park* — real, cites a rule id, not worth doing before the project's finish line
+- *propose* — cites no rule; a candidate new rule for the human to accept or drop
+
+A reviewer may not raise an item on this list as a gap.
+
+### Decisions taken by default
+
+<First-order edge cases (one step from the main case) and carry-overs of existing behaviour, each with the simplest reading taken and one line of reason. Listed so the human can object; never asked. Deeper edge cases are not mentioned at all.>
+
 ### Open questions
 
-<Any ambiguities that need resolving before or during implementation>
+<Only questions that pass all three gates: (1) no rule in the rulebook, CLAUDE.md or a design doc answers it; (2) it is not a carry-over of how an existing thing already behaves; (3) the simplest reading would change what a user can do or see. Anything that fails a gate goes under "Decisions taken by default" with the recommendation taken.>
 ```
 
 ---

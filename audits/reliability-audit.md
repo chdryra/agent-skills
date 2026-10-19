@@ -4,6 +4,8 @@ description: Audit the codebase for reliability failure modes — unhandled erro
 
 Perform a reliability audit of the codebase in the current working directory. Identify failure modes, diagnose their root causes, and apply surgical fixes.
 
+Read `~/.claude/commands/_audit-protocol.md` for the shared protocol governing Phase 0 (scope: the project rulebook, what changed since the last audit, every finding cites a rule), Phase 2.5 (confirm with user), Phase 3 (fix rules + commit format), and Phase 4 (report template). Run Phase 0 before Phase 1 below, and apply the other phases exactly as written there.
+
 ---
 
 ## Phase 1 — Reconnaissance
@@ -61,41 +63,15 @@ Work through each category below. For every issue you find, record:
 
 ---
 
-## Phase 2.5 — Confirm with user
+## Phase 3 addendum — Reliability-specific fix rules
 
-Before fixing anything, present all findings to the user as a list. For each finding include: severity, location (file:line), a one-line description of the issue, and a proposed commit summary in the form `fix(reliability): <what the issue was and what the fix is>`. Then ask two questions:
-
-1. "Which of these would you like me to fix?"
-2. "Should I commit each fix as I go, or leave changes unstaged for you to review first?"
-
-Wait for their response before proceeding. Default to leaving changes unstaged if they don't address the commit question.
+In addition to the shared Phase 3 rules:
+- **Trace the full failure path before fixing.** Understand exactly what happens from the point of failure through to the caller and the user. Fix at the right level — not too early (hiding information), not too late (crashing).
+- **Fail fast and loudly at startup for configuration errors.** A missing required env var should throw at process start, not cause a confusing error on the first request.
 
 ---
 
-## Phase 3 — Fix
-
-Fix only the issues the user approved, one at a time. For every fix:
-
-1. **Understand before changing.** Re-read the relevant code and confirm your root-cause analysis before touching anything.
-2. **Make the minimal change.** Fix only the specific issue. Do not refactor, rename, or improve adjacent code.
-3. **Run tests after every change.** The fix must not alter behaviour beyond the issue being addressed. A fix that breaks existing tests is not acceptable.
-4. **Trace the full failure path before fixing.** Understand exactly what happens from the point of failure through to the caller and the user. Fix at the right level — not too early (hiding information), not too late (crashing).
-5. **Fail fast and loudly at startup for configuration errors.** A missing required env var should throw at process start, not cause a confusing error on the first request.
-6. **Commit only if the user said yes in Phase 2.5.** If committing, one commit per issue:
-   ```
-   fix(reliability): <issue> in <file/function>
-
-   Root cause: <one sentence on the precise cause>
-   Impact: <what this caused or allowed>
-   Fix: <what was changed and why this is correct>
-   ```
-   If not committing, leave changes unstaged and summarise what was changed at the end.
-
----
-
-## Phase 4 — Report
-
-After all fixes are applied, produce a brief findings report. Do not pad it — every finding must include a location and a concrete description. Example:
+## Phase 4 example
 
 ```
 ## Reliability Audit Findings
