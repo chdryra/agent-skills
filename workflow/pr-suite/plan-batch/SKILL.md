@@ -63,6 +63,7 @@ When every planner has reported, give the human **one** short message:
 
 1. A table: ticket, review status, number of open questions, one-line headline of the approach.
 2. Anything a planner found wrong with a ticket (already fixed, stale line numbers, a claim that did not hold).
+2b. If the plans carry a "Decisions taken by default" section (repos with a project rulebook), list those lines for every ticket in the digest, one line each, so the human can object without being asked; and drop any open question that a rulebook rule, CLAUDE.md or a design doc already answers, recording the answer in the plan with the rule id.
 3. Then the **first** open question only, in plain English, with the recommendation and a concrete example where it helps.
 
 Nothing else. The human should be able to answer with one word.

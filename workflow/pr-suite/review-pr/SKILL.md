@@ -119,6 +119,12 @@ Use whichever source is found first. Do not ask the user for requirements.
 
 ---
 
+### Project rulebook
+
+**Project rulebook.** A repo may keep one file of its standing rules, each with a stable id (`P3`, `D7`, `A12`): look for a file named `review-rules.md` under `docs/` or `*/docs/design/` (`git ls-files | grep -i review-rules.md`), or a path CLAUDE.md names for it. If the repo has none, skip every step below that mentions the rulebook.
+
+---
+
 ## Step 4 — Map requirements to implementation
 
 For each scenario or requirement in the ticket:
@@ -131,6 +137,13 @@ For each scenario or requirement in the ticket:
    - **Not applicable** — handled by a different system (e.g. frontend-only).
 
 Note any gaps, edge cases, or risks (e.g. model-dependent behaviour, missing tests, fallback paths).
+
+**Rules (only when the repo has a rulebook).** Judge the diff against every rule id the plan's "Rules touched" names, any rule you think it touches that the plan missed, and the rulebook's per-stack hygiene checks the diff reaches (new write, new listing, new setting, new route, and so on): kept, at risk, or not applicable. Then bin every observation that is not a scenario row:
+- **Fix in this PR** — a rule at risk, or a scenario gap.
+- **Park** — real, cites a rule id, does not block the project's finish line. Name it; the implementer appends it to the rulebook's parked list in the same branch.
+- **Propose** — cites no rule. Listed for the human; never blocks, never a ticket.
+
+Nothing on the plan's "Not doing" or "Decisions taken by default" lists is a gap. A review never files a follow-up ticket.
 
 ---
 
@@ -146,10 +159,19 @@ Note any gaps, edge cases, or risks (e.g. model-dependent behaviour, missing tes
 | **1** — <name> | <ticket requirement> | ✅ / ⚠️ / ❌ / ➖ | <file or "out of diff"> |
 ...
 
+### Rules
+
+<Omit when the repo has no rulebook.>
+
+| Rule | Verdict | Where |
+|---|---|---|
+| `P9` | ✅ kept / ⚠️ at risk / ➖ n/a | <file or "diff"> |
+
 ### Gaps and observations
 
-- <gap 1>
-- <gap 2>
+- **Fix in this PR:** <gap>
+- **Park:** <observation, rule id>
+- **Propose:** <observation with no rule>
 
 ### Verdict
 

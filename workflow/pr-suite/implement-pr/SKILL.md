@@ -115,12 +115,14 @@ git commit -m "<type>(<scope>): <description> [<TICKET-ID>]"
 Read the review output. Check for:
 - Any ❌ rows (missing scenarios) — these must be fixed.
 - Any ⚠️ rows (partial coverage) — evaluate whether they are addressable in code.
+- Any ⚠️ at-risk rows in the review's **Rules** table, and anything the review binned **Fix in this PR** — these must be fixed.
+- Items the review binned **Park** or **Propose** are not gaps and never block. Append each parked item as one line to the project rulebook's parked list in this branch (rule id, what, where, who and date); leave proposals in the review for the human.
 
 **⚠️ rows fall into two categories:**
 - **Addressable** — the scenario can be fully implemented in this PR (e.g. missing logic, incomplete handling). Fix these.
 - **Intentionally partial** — the scenario is handled outside this diff by design (a follow-up PR, a config/prompt change in an external system, etc.). These are acceptable and should not block the loop.
 
-**If the review is clean** (no ❌, and all ⚠️ rows are intentionally partial): proceed to Step 5.
+**If the review is clean** (no ❌, no at-risk rule, nothing binned "Fix in this PR", and all ⚠️ scenario rows are intentionally partial): proceed to Step 5.
 
 **If there are addressable gaps:**
 1. Address each ❌ and each addressable ⚠️ — implement the missing coverage.

@@ -71,6 +71,12 @@ If `<ticket-id>` is a slug (not a tracker ID), or if the tracker fetch fails, us
 
 ---
 
+### Project rulebook
+
+**Project rulebook.** A repo may keep one file of its standing rules, each with a stable id (`P3`, `D7`, `A12`): look for a file named `review-rules.md` under `docs/` or `*/docs/design/` (`git ls-files | grep -i review-rules.md`), or a path CLAUDE.md names for it. If the repo has none, skip every step below that mentions the rulebook.
+
+---
+
 ## Step 3 — Map ticket requirements to the plan
 
 For each scenario or acceptance criterion in the ticket:
@@ -82,6 +88,7 @@ For each scenario or acceptance criterion in the ticket:
    - **Missing** — no mention in the plan.
    - **Out of scope** — ticket itself marks it as out of scope or for a follow-up PR.
 3. Note any risks in the plan's approach — e.g. edge cases not handled, wrong file targeted, approach that will break existing behaviour.
+4. **Rules (only when the repo has a rulebook).** Take every id in the plan's "Rules touched" section, add any rule you think the change touches that the plan missed, and judge each: kept, at risk, or not applicable. A risk must cite a rule id to count as a risk. One that cites none is a *proposal*. Nothing on the plan's "Not doing" or "Decisions taken by default" lists is a gap; do not re-raise it.
 
 ---
 
@@ -99,10 +106,21 @@ Output **only** the assessment block below — no preamble, no narration of what
 | **1** — <name> | <ticket requirement> | ✅ / ⚠️ / ❌ / ➖ | <notes> |
 ...
 
+### Rules
+
+<Omit this table when the repo has no rulebook.>
+
+| Rule | Verdict | Notes |
+|---|---|---|
+| `P9` | ✅ kept / ⚠️ at risk / ➖ n/a | <why> |
+
 ### Risks and concerns
 
-- <risk 1>
-- <risk 2>
+- <risk, citing a rule id where the repo has a rulebook>
+
+### Proposals
+
+- <an observation that cites no rule; never blocks; the human decides whether it becomes a rule>
 
 ### Sign-off
 
@@ -118,8 +136,9 @@ Coverage symbols:
 - ➖ Out of scope.
 
 **Sign-off rules:**
-- **APPROVED** only if there are no ❌ rows and no blocking risks.
-- **CHANGES NEEDED** if any ❌ rows exist, or if a risk would cause incorrect or broken behaviour.
+- **APPROVED** only if there are no ❌ rows, no ⚠️ at-risk rules, and no blocking risks.
+- **CHANGES NEEDED** if any ❌ rows exist, any rule is at risk, or a risk would cause incorrect or broken behaviour.
+- A proposal never changes the verdict.
 
 ---
 
